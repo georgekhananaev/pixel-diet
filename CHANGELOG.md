@@ -5,6 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 ## [Unreleased]
 
 ### Added
+- **assets**: Custom app icon — gradient feather (red/orange to teal/green) on dark grid background with color-matched glows
 - **ui**: Per-run history tracking — each compression run shows as collapsible row with format, quality level, stats, and elapsed time
 - **ui**: Conflict resolution sheet with 6 options (overwrite/rename/skip, each with "apply to all" variant)
 - **ui**: Context menus on image rows (Reveal in Finder, Copy Path, Reveal Output, Remove)

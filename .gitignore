@@ -47,3 +47,4 @@ fastlane/test_output/
 # Code coverage
 *.gcno
 *.gcda
+PixelDiet_Icon_1024.png
