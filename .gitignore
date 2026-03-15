@@ -1,7 +1,7 @@
 # Claude / AI
 .agents/
 .claude/
-skills-lock.json
+scripts/skills-lock.json
 
 # macOS
 .DS_Store
@@ -47,4 +47,4 @@ fastlane/test_output/
 # Code coverage
 *.gcno
 *.gcda
-PixelDiet_Icon_1024.png
+scripts/PixelDiet_Icon_1024.png

@@ -21,8 +21,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **ui**: GPS data warning in settings (live detection, not placeholder)
 - **ui**: Dismiss button on completed batch banner
 - **ui**: Toolbar "Remove N" button when items are selected
+- **ui**: Custom About dialog with version, build info, system details, and copy-to-clipboard
+- **ui**: Help sheet with getting started guide and keyboard shortcut reference
+- **ui**: Support menu with GitHub Issues and Repository links
+- **ui**: Toolbar app icon in navigation bar
+- **docs**: README with project overview, features, architecture, format table, and build instructions
+- **docs**: CONTRIBUTING guide with Swift 6.2 concurrency rules and code guidelines
+- **docs**: Non-Commercial Open Source License
 
 ### Changed
+- **project**: Updated .gitignore to ignore icon generation scripts, JetBrains IDE, and skills-lock.json
+- **ui**: Increased minimum window size to 900x600
+- **ui**: Menu bar Cmd+O now triggers file picker via NotificationCenter
+- **ui**: Settings panel scroll improvements
+
 - **perf**: Rewrite WebP encoder using advanced libwebp API (WebPConfig + WebPMemoryWriter) — 2-3x faster encoding
 - **perf**: Use RGBX import for opaque images, skip alpha channel processing
 - **perf**: Switch ImageListView from ScrollView+LazyVStack to native List for instant selection
