@@ -21,6 +21,20 @@ PixelDiet is a native macOS application for batch image compression, resizing, a
 
 Built entirely with Apple's native frameworks (ImageIO, CoreImage, vImage) plus libwebp for WebP encoding. Zero external dependencies, fully sandboxed, fully offline - your images never leave your Mac.
 
+## Screenshots
+
+<img src="screenshots/main.png" width="860" alt="PixelDiet - Drop zone with settings sidebar">
+
+*Clean drop zone with format, quality, resize, and metadata controls*
+
+<img src="screenshots/converted.png" width="860" alt="PixelDiet - Batch compression results">
+
+*97 images compressed to WebP with per-file savings and batch stats*
+
+<img src="screenshots/skip-info.png" width="860" alt="PixelDiet - Skipped files detail">
+
+*Smart skip detail - files that would get larger are automatically skipped*
+
 ## Features
 
 - **Drag & Drop** - Drop files or folders onto the app window
