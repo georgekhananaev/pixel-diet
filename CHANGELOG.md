@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-03-15
+
 ### Added
 - **assets**: Custom app icon - gradient feather (red/orange to teal/green) on dark grid background with color-matched glows
 - **ui**: Per-run history tracking - each compression run shows as collapsible row with format, quality level, stats, and elapsed time
