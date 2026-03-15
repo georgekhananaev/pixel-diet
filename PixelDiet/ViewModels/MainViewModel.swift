@@ -390,15 +390,4 @@ class MainViewModel {
         undoManager?.setActionName("Clear All")
     }
 
-    func removeItems(_ ids: Set<UUID>, undoManager: UndoManager?) {
-        let removed = batchJob.items.filter { ids.contains($0.id) }
-        batchJob.items.removeAll { ids.contains($0.id) }
-
-        undoManager?.registerUndo(withTarget: self) { vm in
-            Task { @MainActor in
-                vm.batchJob.addItems(removed)
-            }
-        }
-        undoManager?.setActionName("Remove \(removed.count) Items")
-    }
 }

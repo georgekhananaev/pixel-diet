@@ -149,13 +149,6 @@ class BatchJob {
         }
     }
 
-    /// Decrement skipped counter before retry
-    func decrementSkipped() {
-        if let run = runHistory.last(where: { $0.skippedCount > 0 }) {
-            run.skippedCount -= 1
-        }
-    }
-
     /// Incremental original size - updated in addItems, not computed
     private(set) var totalOriginalSize: Int64 = 0
 

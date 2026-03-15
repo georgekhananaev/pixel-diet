@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5EFC97162F6732EA0062BCAB /* libwebp in Frameworks */ = {isa = PBXBuildFile; productRef = AA000002WEBP00000000 /* libwebp */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		5E076ACA2F66CF8F00F4FFB0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5EFC97162F6732EA0062BCAB /* libwebp in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -179,25 +184,6 @@
 		};
 /* End PBXNativeTarget section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		AA000001WEBP00000000 /* XCRemoteSwiftPackageReference "Swift-WebP" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/SDWebImage/libwebp-Xcode.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.4.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		AA000002WEBP00000000 /* libwebp */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AA000001WEBP00000000 /* XCRemoteSwiftPackageReference "Swift-WebP" */;
-			productName = libwebp;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin PBXProject section */
 		5E076AB12F66CF8E00F4FFB0 /* Project object */ = {
 			isa = PBXProject;
@@ -228,11 +214,11 @@
 			);
 			mainGroup = 5E076AB02F66CF8E00F4FFB0;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AA000001WEBP00000000 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5E076ABA2F66CF8E00F4FFB0 /* Products */;
-			packageReferences = (
-				AA000001WEBP00000000 /* XCRemoteSwiftPackageReference "Swift-WebP" */,
-			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -333,8 +319,6 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
-				SUPPORTED_PLATFORMS = macosx;
-				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
@@ -627,6 +611,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AA000001WEBP00000000 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SDWebImage/libwebp-Xcode.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA000002WEBP00000000 /* libwebp */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA000001WEBP00000000 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */;
+			productName = libwebp;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5E076AB12F66CF8E00F4FFB0 /* Project object */;
 }

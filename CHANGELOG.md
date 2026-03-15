@@ -29,6 +29,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **docs**: CONTRIBUTING guide with Swift 6.2 concurrency rules and code guidelines
 - **docs**: Non-Commercial Open Source License
 
+### Removed
+- **viewmodels**: Delete unused SettingsViewModel (functionality handled by CompressionSettings directly)
+- **viewmodels**: Remove unused removeItems() from MainViewModel
+- **models**: Remove unused decrementSkipped() from BatchJob
+
 ### Changed
 - **project**: Updated .gitignore to ignore icon generation scripts, JetBrains IDE, and skills-lock.json
 - **ui**: Increased minimum window size to 900x600

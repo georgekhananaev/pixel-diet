@@ -103,12 +103,15 @@ struct CompressionSettingsTests {
 
     @Test func snapshot() {
         let settings = CompressionSettings()
+        #expect(settings.snapshot() == nil) // nil when no output directory
+
         settings.outputDirectory = URL(fileURLWithPath: "/tmp/test")
         let snap = settings.snapshot()
-        #expect(snap.quality == 80)
-        #expect(snap.maxDimension == 1920)
-        #expect(snap.outputFormat == .jpeg)
-        #expect(snap.outputDirectory.path == "/tmp/test")
+        #expect(snap != nil)
+        #expect(snap?.quality == 80)
+        #expect(snap?.maxDimension == 1920)
+        #expect(snap?.outputFormat == .jpeg)
+        #expect(snap?.outputDirectory.path == "/tmp/test")
     }
 }
 
@@ -193,13 +196,13 @@ struct BatchJobTests {
             originalDimensions: CGSize(width: 100, height: 100)
         )
         job.addItems([item])
+        job.startRun(format: "JPEG", quality: 80, itemCount: 2)
 
-        job.recordCompletion(status: .completed, compressedSize: 500)
+        job.recordCompletion(status: .completed, originalSize: 1000, compressedSize: 500)
         #expect(job.completedCount == 1)
-        #expect(job.totalCompressedSize == 500)
         #expect(job.processedCount == 1)
 
-        job.recordCompletion(status: .failed(error: "test"), compressedSize: nil)
+        job.recordCompletion(status: .failed(error: "test"), originalSize: 1000, compressedSize: nil)
         #expect(job.failedCount == 1)
         #expect(job.processedCount == 2)
     }
@@ -212,11 +215,11 @@ struct BatchJobTests {
             originalDimensions: CGSize(width: 100, height: 100)
         )
         job.addItems([item])
-        job.recordCompletion(status: .completed, compressedSize: 500)
+        job.startRun(format: "JPEG", quality: 80, itemCount: 1)
+        job.recordCompletion(status: .completed, originalSize: 1000, compressedSize: 500)
         job.clear()
         #expect(job.items.isEmpty)
         #expect(job.completedCount == 0)
-        #expect(job.totalCompressedSize == 0)
     }
 }
 

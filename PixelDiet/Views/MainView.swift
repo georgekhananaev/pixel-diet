@@ -184,6 +184,3 @@ struct MainView: View {
         }
     }
 }
-
-// MARK: - Window Icon Setter
-
