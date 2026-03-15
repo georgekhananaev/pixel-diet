@@ -1,17 +1,28 @@
-//
-//  PixelDietApp.swift
-//  PixelDiet
-//
-//  Created by George Khananaev on 3/15/26.
-//
-
 import SwiftUI
+import UserNotifications
 
 @main
 struct PixelDietApp: App {
+    @State private var viewModel = MainViewModel()
+
     var body: some Scene {
-        DocumentGroup(newDocument: PixelDietDocument()) { file in
-            ContentView(document: file.$document)
+        WindowGroup {
+            MainView(viewModel: viewModel)
+                .onAppear {
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+                }
+        }
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("Add Images...") {
+                    // Handled by MainView
+                }
+                .keyboardShortcut("o")
+            }
+        }
+
+        Settings {
+            SettingsWindow(settings: viewModel.settings)
         }
     }
 }
