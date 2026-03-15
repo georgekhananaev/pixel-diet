@@ -94,12 +94,22 @@ nonisolated struct ImageCompressor: ImageCompressing {
         let tempURL = tempDir.appendingPathComponent(UUID().uuidString + "." + outputFormat.fileExtension)
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
+        // Strip alpha channel for formats that don't support it (JPEG, BMP, etc.)
+        // CGImageSourceCreateThumbnailAtIndex often returns AlphaLast even for opaque images,
+        // which causes ImageIO to log warnings and wastes memory on decode.
+        let finalImage: CGImage
+        if !outputFormat.supportsAlpha {
+            finalImage = stripAlpha(from: resizedImage) ?? resizedImage
+        } else {
+            finalImage = resizedImage
+        }
+
         if outputFormat == .webp {
             // Use libwebp for WebP encoding (ImageIO doesn't support WebP writing)
-            try writeWebP(resizedImage, to: tempURL, quality: settings.quality)
+            try writeWebP(finalImage, to: tempURL, quality: settings.quality)
         } else {
             try writeImage(
-                resizedImage,
+                finalImage,
                 to: tempURL,
                 format: outputFormat,
                 utType: utType,
@@ -173,6 +183,33 @@ nonisolated struct ImageCompressor: ImageCompressing {
             return nil
         }
         return properties["ICC Profile" as CFString] as? Data
+    }
+
+    // MARK: - Alpha Stripping
+
+    /// Re-render a CGImage without alpha for opaque output formats.
+    /// Prevents ImageIO "trying to save an opaque image with AlphaLast" warnings.
+    private func stripAlpha(from image: CGImage) -> CGImage? {
+        let alphaInfo = image.alphaInfo
+        if alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast {
+            return image // Already opaque
+        }
+
+        let colorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let context = CGContext(
+            data: nil,
+            width: image.width,
+            height: image.height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else {
+            return nil
+        }
+
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()
     }
 
     // MARK: - Write

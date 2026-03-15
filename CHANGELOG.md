@@ -43,6 +43,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **models**: Add batchRunId and outputFormatUsed to ImageItem for run grouping
 
 ### Fixed
+- **compression**: Strip alpha channel for opaque output formats (JPEG, BMP) to prevent ImageIO warnings and halve decode memory
 - **models**: Savings calculation now only counts completed items (was incorrectly including all queued items)
 - **models**: Add completedOriginalSize counter for accurate savings math
 - **ui**: Remove stale "X selected" toolbar label
