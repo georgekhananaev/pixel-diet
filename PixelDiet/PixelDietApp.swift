@@ -50,19 +50,19 @@ struct PixelDietApp: App {
                 Divider()
 
                 Button("Contact Support") {
-                    if let url = URL(string: "https://github.com/georgekhananaev/pixeldiet/issues") {
+                    if let url = URL(string: "https://github.com/georgekhananaev/pixel-diet/issues") {
                         NSWorkspace.shared.open(url)
                     }
                 }
 
                 Button("Report a Bug") {
-                    if let url = URL(string: "https://github.com/georgekhananaev/pixeldiet/issues") {
+                    if let url = URL(string: "https://github.com/georgekhananaev/pixel-diet/issues") {
                         NSWorkspace.shared.open(url)
                     }
                 }
 
                 Button("GitHub Repository") {
-                    if let url = URL(string: "https://github.com/georgekhananaev/pixeldiet") {
+                    if let url = URL(string: "https://github.com/georgekhananaev/pixel-diet") {
                         NSWorkspace.shared.open(url)
                     }
                 }
@@ -166,7 +166,7 @@ struct CustomAboutView: View {
                         .tracking(0.5)
                     Spacer()
                 }
-                Link("github.com/georgekhananaev/pixeldiet", destination: URL(string: "https://github.com/georgekhananaev/pixeldiet")!)
+                Link("github.com/georgekhananaev/pixel-diet", destination: URL(string: "https://github.com/georgekhananaev/pixel-diet")!)
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.blue)
 

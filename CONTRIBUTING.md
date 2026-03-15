@@ -83,7 +83,7 @@ For larger features, please open an issue first to discuss the approach before w
 
 ## Reporting Bugs
 
-Open an issue at [GitHub Issues](https://github.com/georgekhananaev/PixelDiet/issues) with:
+Open an issue at [GitHub Issues](https://github.com/georgekhananaev/pixel-diet/issues) with:
 
 - macOS version
 - Steps to reproduce

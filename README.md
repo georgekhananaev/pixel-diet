@@ -60,7 +60,7 @@ Built entirely with Apple's native frameworks (ImageIO, CoreImage, vImage) plus 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/georgekhananaev/PixelDiet.git
+   git clone https://github.com/georgekhananaev/pixel-diet.git
    cd PixelDiet
    ```
 
