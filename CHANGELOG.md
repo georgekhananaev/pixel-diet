@@ -65,6 +65,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **services**: Add early dimension validation before expensive resize operation
 - **services**: Add WebP buffer size overflow guard
 - **settings**: Remove stale SettingsViewModel from SettingsWindow
+- **ui**: Fix security-scoped resource leak in Open Output Folder button
+- **ui**: Fix continuation double-resume risk in conflict sheet via single resolveConflict() method
+- **perf**: Replace O(n) item lookup per completion callback with O(1) Dictionary lookup
 - **models**: Savings calculation now only counts completed items (was incorrectly including all queued items)
 - **models**: Add completedOriginalSize counter for accurate savings math
 - **ui**: Remove stale "X selected" toolbar label

@@ -38,6 +38,14 @@ class MainViewModel {
     var pendingOverwriteFile: String?
     var pendingOverwriteContinuation: CheckedContinuation<ConflictChoice, Never>?
 
+    /// Single entry point for resolving a conflict - guarantees continuation is resumed exactly once
+    func resolveConflict(_ choice: ConflictChoice) {
+        guard let continuation = pendingOverwriteContinuation else { return }
+        pendingOverwriteContinuation = nil
+        pendingOverwriteFile = nil
+        continuation.resume(returning: choice)
+    }
+
     // MARK: - Queue Management
 
     func addFiles(urls: [URL]) async {
@@ -247,12 +255,15 @@ class MainViewModel {
         batchJob.isProcessing = true
         NSApp.dockTile.badgeLabel = "0%"
 
+        // Build lookup dictionary for O(1) item access in callback
+        let itemLookup = Dictionary(uniqueKeysWithValues: batchJob.items.map { ($0.id, $0) })
+
         processingTask = Task {
             await batchProcessor.process(
                 tasks: tasks,
                 settings: settingsSnap
             ) { [weak self] id, status, size, dims in
-                guard let self, let item = self.batchJob.items.first(where: { $0.id == id }) else { return }
+                guard let self, let item = itemLookup[id] else { return }
                 item.status = status
                 item.compressedSize = size
                 item.compressedDimensions = dims
@@ -347,12 +358,14 @@ class MainViewModel {
 
         batchJob.isProcessing = true
 
+        let itemLookup = Dictionary(uniqueKeysWithValues: failedItems.map { ($0.id, $0) })
+
         processingTask = Task {
             await batchProcessor.process(
                 tasks: tasks,
                 settings: settingsSnap
             ) { [weak self] id, status, size, dims in
-                guard let self, let item = self.batchJob.items.first(where: { $0.id == id }) else { return }
+                guard let self, let item = itemLookup[id] else { return }
                 item.status = status
                 item.compressedSize = size
                 item.compressedDimensions = dims

@@ -124,20 +124,11 @@ struct MainView: View {
         }
         .sheet(isPresented: Binding(
             get: { viewModel.pendingOverwriteFile != nil },
-            set: { if !$0 {
-                // User dismissed sheet without choosing - default to skip
-                viewModel.pendingOverwriteContinuation?.resume(returning: .skip)
-                viewModel.pendingOverwriteFile = nil
-                viewModel.pendingOverwriteContinuation = nil
-            }}
+            set: { if !$0 { viewModel.resolveConflict(.skip) } }
         )) {
             ConflictSheet(
                 fileName: viewModel.pendingOverwriteFile ?? "",
-                onChoice: { choice in
-                    viewModel.pendingOverwriteContinuation?.resume(returning: choice)
-                    viewModel.pendingOverwriteFile = nil
-                    viewModel.pendingOverwriteContinuation = nil
-                }
+                onChoice: { choice in viewModel.resolveConflict(choice) }
             )
         }
         .frame(minWidth: 900, minHeight: 600)

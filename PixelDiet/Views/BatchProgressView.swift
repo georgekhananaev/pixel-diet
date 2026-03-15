@@ -40,15 +40,15 @@ struct BatchProgressView: View {
             if !batchJob.isProcessing && !batchJob.runHistory.isEmpty {
                 HStack {
                     Spacer()
-                    if let outputDir = BookmarkManager.resolveBookmark() {
-                        Button {
+                    Button {
+                        if let outputDir = BookmarkManager.resolveBookmark() {
                             NSWorkspace.shared.open(outputDir)
                             BookmarkManager.stopAccessing(outputDir)
-                        } label: {
-                            Label(String(localized: "Open Output Folder"), systemImage: "folder")
                         }
-                        .controlSize(.small)
+                    } label: {
+                        Label(String(localized: "Open Output Folder"), systemImage: "folder")
                     }
+                    .controlSize(.small)
                     Button {
                         onDismiss?()
                     } label: {
