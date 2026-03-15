@@ -28,7 +28,7 @@ struct MainView: View {
 
                         if viewModel.batchJob.isProcessing || (!viewModel.batchJob.runHistory.isEmpty && showBatchResults) {
                             Divider()
-                            BatchProgressView(batchJob: viewModel.batchJob, onDismiss: {
+                            BatchProgressView(batchJob: viewModel.batchJob, outputDirectory: viewModel.settings.outputDirectory, onDismiss: {
                                 showBatchResults = false
                             })
                                 .padding()

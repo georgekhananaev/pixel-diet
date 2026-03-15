@@ -3,6 +3,7 @@ import AppKit
 
 struct BatchProgressView: View {
     var batchJob: BatchJob
+    var outputDirectory: URL?
     var onDismiss: (() -> Void)? = nil
     @State private var expandedRunId: Int?
     @State private var showingDetail: StatusDetailInfo?
@@ -40,15 +41,14 @@ struct BatchProgressView: View {
             if !batchJob.isProcessing && !batchJob.runHistory.isEmpty {
                 HStack {
                     Spacer()
-                    Button {
-                        if let outputDir = BookmarkManager.resolveBookmark() {
+                    if let outputDir = outputDirectory {
+                        Button {
                             NSWorkspace.shared.open(outputDir)
-                            BookmarkManager.stopAccessing(outputDir)
+                        } label: {
+                            Label(String(localized: "Open Output Folder"), systemImage: "folder")
                         }
-                    } label: {
-                        Label(String(localized: "Open Output Folder"), systemImage: "folder")
+                        .controlSize(.small)
                     }
-                    .controlSize(.small)
                     Button {
                         onDismiss?()
                     } label: {

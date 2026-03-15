@@ -52,11 +52,6 @@ class MainViewModel {
         // Reset conflict policy when new files are added
         conflictPolicy = .ask
 
-        // Create security-scoped bookmarks for dropped URLs (Round 2 Fix: H-4)
-        for url in urls {
-            try? BookmarkManager.saveBookmark(for: url)
-        }
-
         // Discover images and track input root for relative path computation
         var imageEntries: [(url: URL, inputRoot: URL?)] = []
         for url in urls {

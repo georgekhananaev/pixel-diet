@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 
 ### Fixed
 - **viewmodels**: Compute relative paths from input root for preserve directory structure (was always nil)
+- **ui**: Open Output Folder now opens correct directory (was opening input folder due to bookmark overwrite)
 - **compression**: Remove force unwrap on CGColorSpace in stripAlpha
 - **viewmodels**: Remove force unwraps on effectiveFormat in startCompression and retryFailed
 - **ui**: Remove force unwrap on dictionary access in ImageListView groupedSections
