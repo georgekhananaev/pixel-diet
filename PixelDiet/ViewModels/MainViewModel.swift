@@ -147,7 +147,7 @@ class MainViewModel {
 
         for item in batchJob.items {
             let outputFormat = settingsSnap.outputFormat == .original
-                ? (item.effectiveFormat?.canBeOutput == true ? item.effectiveFormat! : .jpeg)
+                ? (item.effectiveFormat.flatMap { $0.canBeOutput ? $0 : nil } ?? .jpeg)
                 : settingsSnap.outputFormat
 
             var destURL: URL
@@ -285,6 +285,8 @@ class MainViewModel {
 
             // System notification when app is in background
             if !NSApp.isActive {
+                // Request permission lazily, only when we actually need to send
+                try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
                 let content = UNMutableNotificationContent()
                 content.title = "PixelDiet"
                 content.body = "Batch complete - \(batchJob.completedCount) images compressed"
@@ -330,7 +332,7 @@ class MainViewModel {
 
         for item in failedItems {
             let outputFormat = settingsSnap.outputFormat == .original
-                ? (item.effectiveFormat?.canBeOutput == true ? item.effectiveFormat! : .jpeg)
+                ? (item.effectiveFormat.flatMap { $0.canBeOutput ? $0 : nil } ?? .jpeg)
                 : settingsSnap.outputFormat
 
             var destURL: URL

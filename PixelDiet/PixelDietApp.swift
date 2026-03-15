@@ -11,9 +11,6 @@ struct PixelDietApp: App {
     var body: some Scene {
         WindowGroup {
             MainView(viewModel: viewModel)
-                .onAppear {
-                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-                }
                 .sheet(isPresented: $showCustomAbout) {
                     CustomAboutView()
                 }
@@ -28,13 +25,13 @@ struct PixelDietApp: App {
         .commands {
             // Replace default About
             CommandGroup(replacing: .appInfo) {
-                Button("About PixelDiet") {
+                Button(String(localized: "About PixelDiet")) {
                     showCustomAbout = true
                 }
             }
 
             CommandGroup(replacing: .newItem) {
-                Button("Add Images...") {
+                Button(String(localized: "Add Images...")) {
                     NotificationCenter.default.post(name: .addImages, object: nil)
                 }
                 .keyboardShortcut("o")
@@ -42,27 +39,35 @@ struct PixelDietApp: App {
 
             // Support menu
             CommandMenu("Support") {
-                Button("PixelDiet Help") {
+                Button(String(localized: "PixelDiet Help")) {
                     NotificationCenter.default.post(name: .showHelp, object: nil)
                 }
                 .keyboardShortcut("?", modifiers: [.command])
 
                 Divider()
 
-                Button("Contact Support") {
+                Button(String(localized: "Contact Support")) {
                     if let url = URL(string: "https://github.com/georgekhananaev/pixel-diet/issues") {
                         NSWorkspace.shared.open(url)
                     }
                 }
 
-                Button("Report a Bug") {
+                Button(String(localized: "Report a Bug")) {
                     if let url = URL(string: "https://github.com/georgekhananaev/pixel-diet/issues") {
                         NSWorkspace.shared.open(url)
                     }
                 }
 
-                Button("GitHub Repository") {
+                Button(String(localized: "GitHub Repository")) {
                     if let url = URL(string: "https://github.com/georgekhananaev/pixel-diet") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+
+                Divider()
+
+                Button(String(localized: "Privacy Policy")) {
+                    if let url = URL(string: "https://github.com/georgekhananaev/pixel-diet/blob/main/PRIVACY.md") {
                         NSWorkspace.shared.open(url)
                     }
                 }
@@ -142,7 +147,7 @@ struct CustomAboutView: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
 
-                    Text("Batch Image Compression Tool")
+                    Text(String(localized: "Batch Image Compression Tool"))
                         .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                 }
@@ -166,9 +171,11 @@ struct CustomAboutView: View {
                         .tracking(0.5)
                     Spacer()
                 }
-                Link("github.com/georgekhananaev/pixel-diet", destination: URL(string: "https://github.com/georgekhananaev/pixel-diet")!)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.blue)
+                if let repoURL = URL(string: "https://github.com/georgekhananaev/pixel-diet") {
+                    Link("github.com/georgekhananaev/pixel-diet", destination: repoURL)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.blue)
+                }
 
                 InfoSection(title: "Runtime", content: systemInfo)
             }
@@ -193,7 +200,7 @@ struct CustomAboutView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "doc.on.doc")
                             .font(.system(size: 10))
-                        Text("Copy Info")
+                        Text(String(localized: "Copy Info"))
                             .font(.system(size: 11))
                     }
                 }
@@ -208,7 +215,7 @@ struct CustomAboutView: View {
 
                 Spacer()
 
-                Button("OK") { dismiss() }
+                Button(String(localized: "OK")) { dismiss() }
                     .keyboardShortcut(.defaultAction)
                     .controlSize(.small)
             }
@@ -247,11 +254,11 @@ struct HelpView: View {
     var body: some View {
         VStack(spacing: 20) {
             HStack {
-                Text("PixelDiet Help")
+                Text(String(localized: "PixelDiet Help"))
                     .font(.title2)
                     .fontWeight(.bold)
                 Spacer()
-                Button("Done") { dismiss() }
+                Button(String(localized: "Done")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
 

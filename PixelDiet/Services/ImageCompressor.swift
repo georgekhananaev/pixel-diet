@@ -202,7 +202,9 @@ nonisolated struct ImageCompressor: ImageCompressing {
             return image // Already opaque
         }
 
-        let colorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let colorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB) else {
+            return nil
+        }
         guard let context = CGContext(
             data: nil,
             width: image.width,

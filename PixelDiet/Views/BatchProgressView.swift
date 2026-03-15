@@ -57,6 +57,7 @@ struct BatchProgressView: View {
                     }
                     .buttonStyle(.plain)
                     .help(String(localized: "Dismiss"))
+                    .accessibilityLabel(String(localized: "Dismiss"))
                 }
             }
         }

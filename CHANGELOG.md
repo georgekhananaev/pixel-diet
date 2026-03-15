@@ -4,6 +4,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 
 ## [Unreleased]
 
+### Added
+- **privacy**: PrivacyInfo.xcprivacy with UserDefaults, file timestamp, and disk space API declarations
+- **privacy**: PRIVACY.md privacy policy
+- **ui**: Privacy Policy link in Support menu
+- **ui**: Accessibility label on dismiss button in BatchProgressView
+
+### Changed
+- **app**: Notification permission moved to lazy request before first send
+- **app**: All remaining raw UI strings wrapped with String(localized:)
+
+### Fixed
+- **compression**: Remove force unwrap on CGColorSpace in stripAlpha
+- **viewmodels**: Remove force unwraps on effectiveFormat in startCompression and retryFailed
+- **ui**: Remove force unwrap on dictionary access in ImageListView groupedSections
+- **ui**: Remove force unwrap on URL constant in About view
+
 ## [1.0.0] - 2026-03-15
 
 ### Added

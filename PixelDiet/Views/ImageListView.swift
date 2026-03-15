@@ -124,7 +124,7 @@ struct ImageListView: View {
 
         // Completed runs, newest first
         for runId in runGroups.keys.sorted(by: >) {
-            let group = runGroups[runId]!
+            guard let group = runGroups[runId] else { continue }
             let format = group.items.first?.outputFormatUsed ?? "-"
             let header = "Run #\(runId) - \(format) - \(group.completedCount)/\(group.items.count) completed"
             sections.append(ListSection(id: runId, header: header, items: group.items))
