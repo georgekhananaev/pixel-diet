@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **app**: All remaining raw UI strings wrapped with String(localized:)
 
 ### Fixed
+- **viewmodels**: Compute relative paths from input root for preserve directory structure (was always nil)
 - **compression**: Remove force unwrap on CGColorSpace in stripAlpha
 - **viewmodels**: Remove force unwraps on effectiveFormat in startCompression and retryFailed
 - **ui**: Remove force unwrap on dictionary access in ImageListView groupedSections

@@ -57,41 +57,59 @@ class MainViewModel {
             try? BookmarkManager.saveBookmark(for: url)
         }
 
-        // Discover images (async to avoid blocking main thread)
-        // Round 3 Fix: Collect ImageInfo results in TaskGroup, then batch-create
-        // ImageItem instances afterward - avoids N individual MainActor hops.
-        let imageURLs = urls.flatMap { url -> [URL] in
+        // Discover images and track input root for relative path computation
+        var imageEntries: [(url: URL, inputRoot: URL?)] = []
+        for url in urls {
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                return FileManager.default.findImages(in: url)
+                let images = FileManager.default.findImages(in: url)
+                for imageURL in images {
+                    imageEntries.append((url: imageURL, inputRoot: url))
+                }
             } else {
-                return [url]
+                imageEntries.append((url: url, inputRoot: nil))
             }
         }
 
-        let infos = await withTaskGroup(of: (URL, ImageAnalyzer.ImageInfo)?.self) { group in
-            for url in imageURLs {
+        let entries = imageEntries
+        let infos = await withTaskGroup(of: (URL, URL?, ImageAnalyzer.ImageInfo)?.self) { group in
+            for entry in entries {
                 group.addTask { [analyzer] in
-                    guard let info = try? analyzer.analyze(url: url) else { return nil }
-                    return (url, info)
+                    guard let info = try? analyzer.analyze(url: entry.url) else { return nil }
+                    return (entry.url, entry.inputRoot, info)
                 }
             }
 
-            var results: [(URL, ImageAnalyzer.ImageInfo)] = []
+            var results: [(URL, URL?, ImageAnalyzer.ImageInfo)] = []
             for await result in group {
                 if let result { results.append(result) }
             }
             return results
         }
 
-        // Batch-create ImageItems on MainActor (already here - implicit under Swift 6.2)
-        let items = infos.map { url, info in
-            ImageItem(
+        // Batch-create ImageItems on MainActor
+        let items = infos.map { url, inputRoot, info in
+            // Compute relative path from input root directory
+            var relativePath: String? = nil
+            if let inputRoot {
+                let rootPath = inputRoot.standardizedFileURL.path
+                let filePath = url.standardizedFileURL.path
+                if filePath.hasPrefix(rootPath) {
+                    let relative = String(filePath.dropFirst(rootPath.count))
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                    if !relative.isEmpty {
+                        relativePath = relative
+                    }
+                }
+            }
+
+            return ImageItem(
                 sourceURL: url,
                 originalSize: info.fileSize,
                 originalDimensions: info.dimensions,
                 frameCount: info.frameCount,
                 hasGPSData: info.hasGPSData,
+                relativePath: relativePath,
                 bitDepth: info.bitDepth,
                 colorSpaceName: info.colorSpaceName,
                 detectedFormat: info.detectedFormat
