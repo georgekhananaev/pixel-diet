@@ -26,7 +26,7 @@ struct MainView: View {
                             previewItem: $previewItem
                         )
 
-                        if viewModel.batchJob.isProcessing || (viewModel.batchJob.endTime != nil && showBatchResults) {
+                        if viewModel.batchJob.isProcessing || (!viewModel.batchJob.runHistory.isEmpty && showBatchResults) {
                             Divider()
                             BatchProgressView(batchJob: viewModel.batchJob, onDismiss: {
                                 showBatchResults = false
@@ -71,6 +71,18 @@ struct MainView: View {
                     }
                     .keyboardShortcut("r")
                     .disabled(viewModel.batchJob.items.isEmpty || viewModel.settings.outputDirectory == nil)
+                }
+
+                if !selectedItems.isEmpty {
+                    Button {
+                        withAnimation {
+                            viewModel.batchJob.items.removeAll { selectedItems.contains($0.id) }
+                        }
+                        selectedItems.removeAll()
+                    } label: {
+                        Label(String(localized: "Remove \(selectedItems.count)"), systemImage: "minus.circle")
+                    }
+                    .keyboardShortcut(.delete, modifiers: [])
                 }
 
                 if !viewModel.batchJob.items.isEmpty {
@@ -120,12 +132,6 @@ struct MainView: View {
                     viewModel.pendingOverwriteContinuation?.resume(returning: choice)
                 }
             )
-        }
-        .onDeleteCommand {
-            if !selectedItems.isEmpty {
-                viewModel.removeItems(selectedItems, undoManager: undoManager)
-                selectedItems.removeAll()
-            }
         }
         .frame(minWidth: 600, minHeight: 400)
         .navigationTitle(dynamicTitle)

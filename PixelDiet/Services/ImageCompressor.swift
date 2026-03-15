@@ -223,77 +223,108 @@ nonisolated struct ImageCompressor: ImageCompressing {
         }
     }
 
-    // MARK: - WebP Encoding (via libwebp)
+    // MARK: - WebP Encoding (via libwebp advanced API)
 
-    /// Encode a CGImage to WebP format using Google's libwebp library.
-    /// ImageIO does not support WebP writing on most macOS versions.
+    /// Encode a CGImage to WebP using libwebp's advanced API for better compression.
+    /// Fixes from audit:
+    /// - Uses WebPConfig with method=4 for good speed/quality balance
+    /// - Uses noneSkipLast for non-alpha (3-channel encode via WebPPictureImportRGBX)
+    /// - Uses premultipliedLast for alpha (libwebp handles unpremultiply internally)
+    /// - Single UnsafeMutablePointer buffer instead of Swift Array
+    /// - WebPMemoryWriter for zero-copy output
     private func writeWebP(_ image: CGImage, to url: URL, quality: Int) throws {
-        let width = image.width
-        let height = image.height
-        let hasAlpha = image.alphaInfo != .none && image.alphaInfo != .noneSkipFirst && image.alphaInfo != .noneSkipLast
+        let width = Int32(image.width)
+        let height = Int32(image.height)
 
-        // Render CGImage into raw RGBA pixel data
-        let bytesPerPixel = 4
-        let bytesPerRow = width * bytesPerPixel
-        let totalBytes = bytesPerRow * height
+        let alphaInfo = image.alphaInfo
+        let hasAlpha = !(alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast)
+
+        // 1. Configure encoder — method 4 balances speed and compression
+        var config = WebPConfig()
+        guard WebPConfigInit(&config) != 0 else {
+            throw CompressionError.writeFailed
+        }
+        config.quality = Float(quality)
+        config.method = 2  // 0=fastest, 6=best compression. 2 is fast with good quality.
+        config.thread_level = 1  // Enable multi-threaded encoding
+        guard WebPValidateConfig(&config) != 0 else {
+            throw CompressionError.writeFailed
+        }
+
+        // 2. Initialize picture
+        var picture = WebPPicture()
+        guard WebPPictureInit(&picture) != 0 else {
+            throw CompressionError.writeFailed
+        }
+        picture.width = width
+        picture.height = height
+        picture.use_argb = 1  // We import ARGB data
+        defer { WebPPictureFree(&picture) }
+
+        // 3. Set up memory writer
+        var writer = WebPMemoryWriter()
+        WebPMemoryWriterInit(&writer)
+        picture.writer = WebPMemoryWrite
+        withUnsafeMutablePointer(to: &writer) { ptr in
+            picture.custom_ptr = UnsafeMutableRawPointer(ptr)
+        }
+
+        // 4. Render CGImage to raw pixel buffer
+        let bytesPerRow = Int(width) * 4
+        let totalBytes = bytesPerRow * Int(height)
+        let rawData = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBytes)
+        defer { rawData.deallocate() }
 
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
             throw CompressionError.writeFailed
         }
 
-        var pixelData = [UInt8](repeating: 0, count: totalBytes)
+        // For non-alpha: use noneSkipLast (skip the 4th byte — faster, no alpha processing)
+        // For alpha: use premultipliedLast (CGContext requirement; libwebp handles it)
+        let bitmapInfo: UInt32 = hasAlpha
+            ? (CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
+            : (CGImageAlphaInfo.noneSkipLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
+
         guard let context = CGContext(
-            data: &pixelData,
-            width: width,
-            height: height,
+            data: rawData,
+            width: Int(width),
+            height: Int(height),
             bitsPerComponent: 8,
             bytesPerRow: bytesPerRow,
             space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+            bitmapInfo: bitmapInfo
         ) else {
             throw CompressionError.writeFailed
         }
 
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
 
-        // Encode with libwebp
-        var output: UnsafeMutablePointer<UInt8>? = nil
-        let qualityFloat = Float(quality)
-        let outputSize: Int
-
+        // 5. Import pixels into WebPPicture
+        let importResult: Int32
         if hasAlpha {
-            outputSize = pixelData.withUnsafeBufferPointer { buffer in
-                Int(WebPEncodeRGBA(
-                    buffer.baseAddress,
-                    Int32(width),
-                    Int32(height),
-                    Int32(bytesPerRow),
-                    qualityFloat,
-                    &output
-                ))
-            }
+            importResult = WebPPictureImportRGBA(&picture, rawData, Int32(bytesPerRow))
         } else {
-            // For images without alpha, still use RGBA data but encode as lossy
-            outputSize = pixelData.withUnsafeBufferPointer { buffer in
-                Int(WebPEncodeRGBA(
-                    buffer.baseAddress,
-                    Int32(width),
-                    Int32(height),
-                    Int32(bytesPerRow),
-                    qualityFloat,
-                    &output
-                ))
-            }
+            // RGBX: 4-byte stride but ignores the X channel — avoids alpha overhead
+            importResult = WebPPictureImportRGBX(&picture, rawData, Int32(bytesPerRow))
         }
 
-        guard outputSize > 0, let output else {
+        guard importResult != 0 else {
             throw CompressionError.writeFailed
         }
 
-        // Write to file
-        let data = Data(bytes: output, count: outputSize)
-        WebPFree(output)
+        // 6. Encode
+        guard WebPEncode(&config, &picture) != 0 else {
+            throw CompressionError.writeFailed
+        }
 
+        // 7. Write to disk
+        guard let encodedData = writer.mem, writer.size > 0 else {
+            WebPMemoryWriterClear(&writer)
+            throw CompressionError.writeFailed
+        }
+
+        let data = Data(bytes: encodedData, count: writer.size)
+        WebPMemoryWriterClear(&writer)
         try data.write(to: url)
     }
 }

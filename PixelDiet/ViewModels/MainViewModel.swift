@@ -105,6 +105,9 @@ class MainViewModel {
     // MARK: - Compression
 
     func startCompression() async {
+        // Reset conflict policy for each new compression run
+        conflictPolicy = .ask
+
         guard let outputDir = settings.outputDirectory else {
             errorMessage = String(localized: "Please select an output folder first.")
             return
@@ -174,12 +177,12 @@ class MainViewModel {
                             }
                         case .skip:
                             item.status = .skipped(reason: "File exists")
-                            batchJob.recordCompletion(status: .skipped(reason: "File exists"), compressedSize: nil)
+                            batchJob.recordCompletion(status: .skipped(reason: "File exists"), originalSize: item.originalSize, compressedSize: nil)
                             continue
                         case .skipAll:
                             conflictPolicy = .skipAll
                             item.status = .skipped(reason: "File exists")
-                            batchJob.recordCompletion(status: .skipped(reason: "File exists"), compressedSize: nil)
+                            batchJob.recordCompletion(status: .skipped(reason: "File exists"), originalSize: item.originalSize, compressedSize: nil)
                             continue
                         }
                     } else {
@@ -203,7 +206,7 @@ class MainViewModel {
                 case .skipAll:
                     if existsOnDisk {
                         item.status = .skipped(reason: "File exists")
-                        batchJob.recordCompletion(status: .skipped(reason: "File exists"), compressedSize: nil)
+                        batchJob.recordCompletion(status: .skipped(reason: "File exists"), originalSize: item.originalSize, compressedSize: nil)
                         continue
                     }
                     // In-batch collision — rename
@@ -219,13 +222,19 @@ class MainViewModel {
             tasks.append(task)
 
             item.status = .processing
+            item.outputFormatUsed = outputFormat.displayName
+        }
+
+        // Start a new run with its own counters
+        let formatName = settingsSnap.outputFormat.displayName
+        batchJob.startRun(format: formatName, quality: settingsSnap.quality, itemCount: tasks.count)
+
+        // Stamp items with current run ID
+        for item in batchJob.items where item.status == .processing {
+            item.batchRunId = batchJob.currentRunId
         }
 
         batchJob.isProcessing = true
-        batchJob.startTime = Date()
-        batchJob.endTime = nil
-
-        // Reset counters for fresh batch
         NSApp.dockTile.badgeLabel = "0%"
 
         processingTask = Task {
@@ -237,7 +246,7 @@ class MainViewModel {
                 item.status = status
                 item.compressedSize = size
                 item.compressedDimensions = dims
-                self.batchJob.recordCompletion(status: status, compressedSize: size)
+                self.batchJob.recordCompletion(status: status, originalSize: item.originalSize, compressedSize: size)
 
                 // Update dock badge with progress percentage
                 let pct = Int(self.batchJob.progress * 100)
@@ -245,7 +254,7 @@ class MainViewModel {
             }
 
             batchJob.isProcessing = false
-            batchJob.endTime = Date()
+            batchJob.finishRun()
 
             // Clear dock badge
             NSApp.dockTile.badgeLabel = nil
@@ -327,7 +336,7 @@ class MainViewModel {
                 item.status = status
                 item.compressedSize = size
                 item.compressedDimensions = dims
-                self.batchJob.recordCompletion(status: status, compressedSize: size)
+                self.batchJob.recordCompletion(status: status, originalSize: item.originalSize, compressedSize: size)
             }
 
             batchJob.isProcessing = false

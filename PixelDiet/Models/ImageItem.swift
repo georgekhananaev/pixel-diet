@@ -21,6 +21,11 @@ class ImageItem: Identifiable {
     var compressedDimensions: CGSize?
     var errorMessage: String?
 
+    /// Which compression run this item was part of (nil = not yet processed)
+    var batchRunId: Int?
+    /// The output format used for this item's compression
+    var outputFormatUsed: String?
+
     var thumbnail: NSImage?
 
     var savingsPercentage: Double? {

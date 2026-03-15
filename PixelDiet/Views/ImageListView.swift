@@ -6,7 +6,6 @@ struct ImageListView: View {
     @Binding var selectedItems: Set<UUID>
     @Binding var previewItem: ImageItem?
     @State private var isDropTargeted = false
-    @State private var sortAscending = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,41 +29,47 @@ struct ImageListView: View {
                 Divider()
             }
 
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(sortedItems) { item in
-                        ImageRow(item: item)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 4)
-                            .background(
-                                selectedItems.contains(item.id)
-                                    ? Color.accentColor.opacity(0.15)
-                                    : Color.clear
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                handleSelection(item: item)
-                            }
-                            .onTapGesture(count: 2) {
-                                if case .completed = item.status {
-                                    previewItem = item
+            List(selection: $selectedItems) {
+                ForEach(groupedSections) { section in
+                    Section {
+                        ForEach(section.items) { item in
+                            ImageRow(
+                                item: item,
+                                onMenuAction: { action in
+                                    handleMenuAction(action, for: item)
                                 }
-                            }
+                            )
+                            .tag(item.id)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                             .contextMenu {
                                 contextMenuItems(for: item)
                             }
-                            .onDrag {
-                                if case .completed = item.status, let destURL = item.destinationURL {
-                                    return NSItemProvider(object: destURL as NSURL)
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    withAnimation {
+                                        viewModel.batchJob.items.removeAll { $0.id == item.id }
+                                    }
+                                } label: {
+                                    Label(String(localized: "Remove"), systemImage: "trash")
                                 }
-                                return NSItemProvider(object: item.sourceURL as NSURL)
                             }
-
-                        Divider()
-                            .padding(.leading, 52)
+                        }
+                    } header: {
+                        if let header = section.header {
+                            Text(header)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
-                .animation(.easeInOut(duration: 0.25), value: viewModel.batchJob.items.map(\.id))
+            }
+            .listStyle(.inset(alternatesRowBackgrounds: true))
+            .onDeleteCommand {
+                guard !selectedItems.isEmpty else { return }
+                withAnimation {
+                    viewModel.batchJob.items.removeAll { selectedItems.contains($0.id) }
+                }
+                selectedItems.removeAll()
             }
 
             // Summary bar at bottom
@@ -86,64 +91,109 @@ struct ImageListView: View {
         }
     }
 
+    // MARK: - Sections
+
+    private struct ListSection: Identifiable {
+        let id: Int // run ID, or -1 for pending
+        let header: String?
+        let items: [ImageItem]
+    }
+
+    private var groupedSections: [ListSection] {
+        // Group items by batchRunId
+        var sections: [ListSection] = []
+        var pending: [ImageItem] = []
+        var runGroups: [Int: [ImageItem]] = [:]
+
+        for item in viewModel.batchJob.items {
+            if let runId = item.batchRunId {
+                runGroups[runId, default: []].append(item)
+            } else {
+                pending.append(item)
+            }
+        }
+
+        // Pending items (not yet processed) go first with no header
+        if !pending.isEmpty {
+            sections.append(ListSection(id: -1, header: nil, items: pending))
+        }
+
+        // Completed runs in order, newest first
+        for runId in runGroups.keys.sorted(by: >) {
+            let items = runGroups[runId]!
+            let format = items.first?.outputFormatUsed ?? "—"
+            let completedInRun = items.filter {
+                if case .completed = $0.status { return true }
+                return false
+            }.count
+            let header = "Run #\(runId) — \(format) — \(completedInRun)/\(items.count) completed"
+            sections.append(ListSection(id: runId, header: header, items: items))
+        }
+
+        return sections
+    }
+
+    // MARK: - Menu Actions
+
+    enum MenuAction {
+        case revealSource
+        case revealOutput
+        case copyPath
+        case remove
+    }
+
+    private func handleMenuAction(_ action: MenuAction, for item: ImageItem) {
+        switch action {
+        case .revealSource:
+            NSWorkspace.shared.activateFileViewerSelecting([item.sourceURL])
+        case .revealOutput:
+            if let destURL = item.destinationURL {
+                NSWorkspace.shared.activateFileViewerSelecting([destURL])
+            }
+        case .copyPath:
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(item.sourceURL.path, forType: .string)
+        case .remove:
+            withAnimation {
+                viewModel.batchJob.items.removeAll { $0.id == item.id }
+            }
+        }
+    }
+
     @ViewBuilder
     private func contextMenuItems(for item: ImageItem) -> some View {
         Button {
-            NSWorkspace.shared.activateFileViewerSelecting([item.sourceURL])
+            handleMenuAction(.revealSource, for: item)
         } label: {
             Label(String(localized: "Reveal in Finder"), systemImage: "folder")
         }
 
         Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(item.sourceURL.path, forType: .string)
+            handleMenuAction(.copyPath, for: item)
         } label: {
             Label(String(localized: "Copy Path"), systemImage: "doc.on.doc")
         }
 
-        if case .completed = item.status, let destURL = item.destinationURL {
+        if case .completed = item.status, item.destinationURL != nil {
             Divider()
 
             Button {
-                NSWorkspace.shared.activateFileViewerSelecting([destURL])
+                handleMenuAction(.revealOutput, for: item)
             } label: {
                 Label(String(localized: "Reveal Output in Finder"), systemImage: "folder.badge.checkmark")
             }
-
-            Text("Drag row to export compressed file")
-                .foregroundStyle(.secondary)
         }
 
         Divider()
 
         Button(role: .destructive) {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                viewModel.batchJob.items.removeAll { $0.id == item.id }
-            }
+            handleMenuAction(.remove, for: item)
         } label: {
             Label(String(localized: "Remove from Queue"), systemImage: "trash")
         }
     }
 
-    private var sortedItems: [ImageItem] {
-        if sortAscending {
-            return viewModel.batchJob.items.sorted { $0.fileName.localizedCompare($1.fileName) == .orderedAscending }
-        } else {
-            return viewModel.batchJob.items.sorted { $0.fileName.localizedCompare($1.fileName) == .orderedDescending }
-        }
-    }
-
-    private func handleSelection(item: ImageItem) {
-        if NSEvent.modifierFlags.contains(.command) {
-            if selectedItems.contains(item.id) {
-                selectedItems.remove(item.id)
-            } else {
-                selectedItems.insert(item.id)
-            }
-        } else {
-            selectedItems = [item.id]
-        }
-    }
+    // MARK: - Drop
 
     private func handleDrop(providers: [NSItemProvider]) {
         var urls: [URL] = []
@@ -173,29 +223,30 @@ struct ImageListView: View {
 
 struct ImageRow: View {
     var item: ImageItem
+    var onMenuAction: ((ImageListView.MenuAction) -> Void)?
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             // Thumbnail
             if let thumbnail = item.thumbnail {
                 Image(nsImage: thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 32, height: 32)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(.quaternary)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 32, height: 32)
                     .overlay {
                         Image(systemName: "photo")
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
             }
 
             // File info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     Text(item.fileName)
                         .font(.body)
@@ -211,7 +262,7 @@ struct ImageRow: View {
                     }
                 }
 
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     FileSizeLabel(bytes: item.originalSize)
 
                     if let format = item.effectiveFormat {
@@ -220,7 +271,7 @@ struct ImageRow: View {
                             .foregroundStyle(.tertiary)
                     }
 
-                    Text("\(Int(item.originalDimensions.width)) x \(Int(item.originalDimensions.height))")
+                    Text("\(Int(item.originalDimensions.width))×\(Int(item.originalDimensions.height))")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -238,12 +289,54 @@ struct ImageRow: View {
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                    .frame(width: 70, alignment: .trailing)
+                    .frame(width: 65, alignment: .trailing)
             }
 
             // Status badge
             StatusBadge(status: item.status)
-                .frame(width: 24)
+                .frame(width: 20)
+
+            // Menu button
+            Menu {
+                if let onMenuAction {
+                    Button {
+                        onMenuAction(.revealSource)
+                    } label: {
+                        Label(String(localized: "Reveal in Finder"), systemImage: "folder")
+                    }
+
+                    Button {
+                        onMenuAction(.copyPath)
+                    } label: {
+                        Label(String(localized: "Copy Path"), systemImage: "doc.on.doc")
+                    }
+
+                    if case .completed = item.status, item.destinationURL != nil {
+                        Divider()
+                        Button {
+                            onMenuAction(.revealOutput)
+                        } label: {
+                            Label(String(localized: "Reveal Output"), systemImage: "folder.badge.checkmark")
+                        }
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        onMenuAction(.remove)
+                    } label: {
+                        Label(String(localized: "Remove"), systemImage: "trash")
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.tertiary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(width: 22)
+            .help(String(localized: "Actions"))
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
