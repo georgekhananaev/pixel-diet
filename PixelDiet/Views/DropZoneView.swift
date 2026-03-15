@@ -73,6 +73,7 @@ struct DropZoneView: View {
     }
 
     private func handleDrop(providers: [NSItemProvider]) {
+        let queue = DispatchQueue(label: "com.georgekhananaev.PixelDiet.drop")
         var urls: [URL] = []
         let group = DispatchGroup()
 
@@ -81,7 +82,7 @@ struct DropZoneView: View {
             group.enter()
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 if let url {
-                    urls.append(url)
+                    queue.sync { urls.append(url) }
                 }
                 group.leave()
             }

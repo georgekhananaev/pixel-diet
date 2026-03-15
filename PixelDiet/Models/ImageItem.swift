@@ -29,7 +29,7 @@ class ImageItem: Identifiable {
     var thumbnail: NSImage?
 
     var savingsPercentage: Double? {
-        guard let compressed = compressedSize else { return nil }
+        guard let compressed = compressedSize, originalSize > 0 else { return nil }
         return Double(originalSize - compressed) / Double(originalSize) * 100.0
     }
 

@@ -1,4 +1,4 @@
-/// Must be nonisolated — used in callbacks across actor boundaries
+/// Must be nonisolated - used in callbacks across actor boundaries
 nonisolated enum ProcessingStatus: Equatable, Sendable {
     case queued
     case processing

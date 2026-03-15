@@ -34,7 +34,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **ui**: Increased minimum window size to 900x600
 - **ui**: Menu bar Cmd+O now triggers file picker via NotificationCenter
 - **ui**: Settings panel scroll improvements
-
+- **ui**: Quality slider renders without tick marks for smoother appearance
+- **ui**: Escape key dismisses conflict dialog (defaults to skip)
+- **ui**: Added accessibility labels to savings indicator and compressed size
+- **perf**: Bounded thumbnail loading with TaskGroup (max 8 concurrent instead of unbounded)
+- **perf**: Image preview loading offloaded to detached task
+- **perf**: Optimized image list section grouping to single-pass
+- **services**: ThumbnailService uses Task.detached instead of @concurrent
+- **services**: PathSanitizer overlap validation uses pathComponents comparison
+- **services**: FileManager helpers now log errors via os.Logger
+- **services**: BatchProcessor throttle loop handles cancellation safely
+- **services**: BookmarkManager clears stale bookmark when access fails
 - **perf**: Rewrite WebP encoder using advanced libwebp API (WebPConfig + WebPMemoryWriter) - 2-3x faster encoding
 - **perf**: Use RGBX import for opaque images, skip alpha channel processing
 - **perf**: Switch ImageListView from ScrollView+LazyVStack to native List for instant selection
@@ -44,6 +54,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 
 ### Fixed
 - **compression**: Strip alpha channel for opaque output formats (JPEG, BMP) to prevent ImageIO warnings and halve decode memory
+- **models**: Remove force unwrap in CompressionSettings.snapshot() - returns optional instead
+- **models**: Guard division by zero in ImageItem.savingsPercentage
+- **ui**: Fix race condition in drag-and-drop URL collection with serial queue
+- **ui**: Fix CheckedContinuation hang when conflict dialog dismissed without choice
+- **ui**: Fix conflict sheet binding to properly clean up continuation state
+- **ui**: Fix cancelCompression to clear isProcessing, dock badge, and mark items
+- **services**: Fix WebP memory leak - WebPMemoryWriterClear now in defer block
+- **services**: Add canBeOutput validation before attempting compression
+- **services**: Add early dimension validation before expensive resize operation
+- **services**: Add WebP buffer size overflow guard
+- **settings**: Remove stale SettingsViewModel from SettingsWindow
 - **models**: Savings calculation now only counts completed items (was incorrectly including all queued items)
 - **models**: Add completedOriginalSize counter for accurate savings math
 - **ui**: Remove stale "X selected" toolbar label

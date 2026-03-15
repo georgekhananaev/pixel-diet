@@ -124,12 +124,19 @@ struct MainView: View {
         }
         .sheet(isPresented: Binding(
             get: { viewModel.pendingOverwriteFile != nil },
-            set: { _ in }
+            set: { if !$0 {
+                // User dismissed sheet without choosing - default to skip
+                viewModel.pendingOverwriteContinuation?.resume(returning: .skip)
+                viewModel.pendingOverwriteFile = nil
+                viewModel.pendingOverwriteContinuation = nil
+            }}
         )) {
             ConflictSheet(
                 fileName: viewModel.pendingOverwriteFile ?? "",
                 onChoice: { choice in
                     viewModel.pendingOverwriteContinuation?.resume(returning: choice)
+                    viewModel.pendingOverwriteFile = nil
+                    viewModel.pendingOverwriteContinuation = nil
                 }
             )
         }
@@ -160,12 +167,12 @@ struct MainView: View {
         let batchJob = viewModel.batchJob
         if batchJob.isProcessing {
             let pct = Int(batchJob.progress * 100)
-            return "PixelDiet \u{2014} Compressing... \(pct)%"
+            return "PixelDiet - Compressing... \(pct)%"
         } else if !batchJob.items.isEmpty {
             let count = batchJob.items.count
             let totalSize = batchJob.totalOriginalSize
             let formattedSize = ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
-            return "PixelDiet \u{2014} \(count) images (\(formattedSize))"
+            return "PixelDiet - \(count) images (\(formattedSize))"
         } else {
             return "PixelDiet"
         }

@@ -1,7 +1,7 @@
 import Foundation
 import ImageIO
 
-/// Returns CGImage (which is Sendable) — convert to NSImage on @MainActor.
+/// Returns CGImage (which is Sendable) - convert to NSImage on @MainActor.
 /// NSImage is NOT Sendable and cannot cross actor boundaries.
 /// Uses NSCache for automatic memory-pressure eviction.
 ///
@@ -21,8 +21,10 @@ actor ThumbnailService {
             return cached.image
         }
 
-        // Offload ImageIO work to background — avoid serializing on actor executor
-        let cgImage = await Self.generateThumbnail(for: url, maxSize: maxSize)
+        // Offload ImageIO work to a detached task to avoid serializing on actor executor
+        let cgImage = await Task.detached {
+            Self.generateThumbnailSync(for: url, maxSize: maxSize)
+        }.value
 
         if let cgImage {
             cache.setObject(CGImageWrapper(cgImage), forKey: url as NSURL)
@@ -30,9 +32,8 @@ actor ThumbnailService {
         return cgImage
     }
 
-    /// Offload expensive ImageIO work to concurrent thread pool
-    @concurrent
-    private static func generateThumbnail(for url: URL, maxSize: CGFloat) async -> CGImage? {
+    /// Synchronous thumbnail generation - called from detached task
+    private nonisolated static func generateThumbnailSync(for url: URL, maxSize: CGFloat) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
 
         let options: [CFString: Any] = [
@@ -49,8 +50,8 @@ actor ThumbnailService {
     }
 }
 
-/// NSCache requires class values — simple wrapper for CGImage.
-/// Must be `nonisolated` — used inside actor. (Round 3 Fix)
+/// NSCache requires class values - simple wrapper for CGImage.
+/// Must be `nonisolated` - used inside actor. (Round 3 Fix)
 nonisolated final class CGImageWrapper: NSObject {
     let image: CGImage
     init(_ image: CGImage) { self.image = image }

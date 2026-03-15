@@ -2,7 +2,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Must be `nonisolated` — used from both MainActor and background services.
+/// Must be `nonisolated` - used from both MainActor and background services.
 /// Without this, static properties like `allInputExtensions` can't be accessed
 /// from nonisolated contexts (ImageCompressor, FileManager.findImages, etc.)
 nonisolated enum ImageFormat: String, CaseIterable, Identifiable, Codable, Sendable {
@@ -36,7 +36,7 @@ nonisolated enum ImageFormat: String, CaseIterable, Identifiable, Codable, Senda
         }
     }
 
-    /// UTType for ImageIO — returns nil for .original (resolved at compression time)
+    /// UTType for ImageIO - returns nil for .original (resolved at compression time)
     var utType: UTType? {
         switch self {
         case .original: nil
@@ -80,7 +80,7 @@ nonisolated enum ImageFormat: String, CaseIterable, Identifiable, Codable, Senda
         }
     }
 
-    /// Whether this format can be used as output — checks runtime ImageIO support
+    /// Whether this format can be used as output - checks runtime ImageIO support
     var canBeOutput: Bool {
         switch self {
         case .ppm: false

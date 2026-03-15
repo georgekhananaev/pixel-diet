@@ -30,8 +30,8 @@ struct SettingsPanel: View {
                 Text(String(localized: "Format"))
             }
 
-            Section {
-                if settings.outputFormat.supportsQuality || settings.outputFormat == .original {
+            if settings.outputFormat.supportsQuality || settings.outputFormat == .original {
+                Section {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(String(localized: "Quality"))
@@ -46,8 +46,7 @@ struct SettingsPanel: View {
                                 get: { Double(settings.quality) },
                                 set: { settings.setQuality(Int($0)) }
                             ),
-                            in: 10...100,
-                            step: 1
+                            in: 10...100
                         )
                         .help("Higher quality = larger file size. 80 is recommended for most uses.")
 
@@ -61,9 +60,9 @@ struct SettingsPanel: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
+                } header: {
+                    Text(String(localized: "Quality"))
                 }
-            } header: {
-                Text(String(localized: "Quality"))
             }
 
             Section {

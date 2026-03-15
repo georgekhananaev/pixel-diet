@@ -8,7 +8,7 @@ nonisolated struct PathSanitizer {
         format: ImageFormat,
         relativePath: String?
     ) throws -> URL {
-        // Sanitize filename — strip path separators
+        // Sanitize filename - strip path separators
         let baseName = source.deletingPathExtension().lastPathComponent
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "\\", with: "_")
@@ -33,7 +33,7 @@ nonisolated struct PathSanitizer {
             destURL = outputDir.appendingPathComponent(fileName)
         }
 
-        // NOTE: Do NOT resolve collisions here — the ViewModel handles overwrite
+        // NOTE: Do NOT resolve collisions here - the ViewModel handles overwrite
         // dialogs and in-memory collision resolution before dispatching to BatchProcessor.
         return destURL
     }
@@ -74,27 +74,27 @@ nonisolated struct PathSanitizer {
     /// Validate output directory does not overlap with input.
     /// Only blocks when:
     /// - Output dir is the SAME as an input dir (would overwrite originals)
-    /// - Input files are INSIDE the output dir (output is parent of input — could overwrite)
-    /// Allows output to be a subfolder of input — that's a common valid use case.
+    /// - Input files are INSIDE the output dir (output is parent of input - could overwrite)
+    /// Allows output to be a subfolder of input - that's a common valid use case.
     static func validateNoOverlap(inputURLs: [URL], outputDir: URL) throws {
-        let outputPath = outputDir.resolvingSymlinksInPath().path
-        let outputNorm = outputPath.hasSuffix("/") ? outputPath : outputPath + "/"
+        // Use standardizedFileURL to resolve symlinks, .., and trailing slashes consistently
+        let outputComponents = outputDir.resolvingSymlinksInPath().standardizedFileURL.pathComponents
 
-        var checkedDirs = Set<String>()
+        var checkedDirs = Set<[String]>()
         for url in inputURLs {
-            let inputDir = url.deletingLastPathComponent().resolvingSymlinksInPath().path
-            guard !checkedDirs.contains(inputDir) else { continue }
-            checkedDirs.insert(inputDir)
-
-            let inputNorm = inputDir.hasSuffix("/") ? inputDir : inputDir + "/"
+            let inputDir = url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL
+            let inputComponents = inputDir.pathComponents
+            guard !checkedDirs.contains(inputComponents) else { continue }
+            checkedDirs.insert(inputComponents)
 
             // Block if same directory
-            if inputNorm == outputNorm {
+            if inputComponents == outputComponents {
                 throw CompressionError.inputOutputOverlap
             }
 
             // Block if input is inside output (output is parent of input)
-            if inputNorm.hasPrefix(outputNorm) {
+            if inputComponents.count > outputComponents.count
+                && Array(inputComponents.prefix(outputComponents.count)) == outputComponents {
                 throw CompressionError.inputOutputOverlap
             }
         }

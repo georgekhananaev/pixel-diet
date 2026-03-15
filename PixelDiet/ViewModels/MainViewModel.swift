@@ -34,7 +34,7 @@ class MainViewModel {
 
     var conflictPolicy: ConflictPolicy = .ask
 
-    /// Pending overwrite confirmation — set when a conflict is found during startCompression
+    /// Pending overwrite confirmation - set when a conflict is found during startCompression
     var pendingOverwriteFile: String?
     var pendingOverwriteContinuation: CheckedContinuation<ConflictChoice, Never>?
 
@@ -51,7 +51,7 @@ class MainViewModel {
 
         // Discover images (async to avoid blocking main thread)
         // Round 3 Fix: Collect ImageInfo results in TaskGroup, then batch-create
-        // ImageItem instances afterward — avoids N individual MainActor hops.
+        // ImageItem instances afterward - avoids N individual MainActor hops.
         let imageURLs = urls.flatMap { url -> [URL] in
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
@@ -76,7 +76,7 @@ class MainViewModel {
             return results
         }
 
-        // Batch-create ImageItems on MainActor (already here — implicit under Swift 6.2)
+        // Batch-create ImageItems on MainActor (already here - implicit under Swift 6.2)
         let items = infos.map { url, info in
             ImageItem(
                 sourceURL: url,
@@ -92,11 +92,18 @@ class MainViewModel {
 
         batchJob.addItems(items)
 
-        // Load thumbnails async
-        for item in items {
-            Task {
-                if let cgImage = await thumbnailService.thumbnail(for: item.sourceURL) {
-                    item.thumbnail = NSImage(cgImage: cgImage, size: .zero)
+        // Load thumbnails async with bounded concurrency
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                var launched = 0
+                for item in items {
+                    if launched >= 8 { await group.next(); launched -= 1 }
+                    launched += 1
+                    group.addTask { [thumbnailService] in
+                        if let cgImage = await thumbnailService.thumbnail(for: item.sourceURL) {
+                            await MainActor.run { item.thumbnail = NSImage(cgImage: cgImage, size: .zero) }
+                        }
+                    }
                 }
             }
         }
@@ -123,7 +130,10 @@ class MainViewModel {
         }
 
         // Pre-compute destination paths with collision resolution
-        let settingsSnap = settings.snapshot()
+        guard let settingsSnap = settings.snapshot() else {
+            errorMessage = String(localized: "Please select an output folder first.")
+            return
+        }
         var reservedPaths = Set<String>()
         var tasks: [ImageTask] = []
 
@@ -186,7 +196,7 @@ class MainViewModel {
                             continue
                         }
                     } else {
-                        // In-batch collision only — auto-rename
+                        // In-batch collision only - auto-rename
                         while reservedPaths.contains(destURL.path) {
                             destURL = PathSanitizer.appendCounter(destURL)
                         }
@@ -209,7 +219,7 @@ class MainViewModel {
                         batchJob.recordCompletion(status: .skipped(reason: "File exists"), originalSize: item.originalSize, compressedSize: nil)
                         continue
                     }
-                    // In-batch collision — rename
+                    // In-batch collision - rename
                     while reservedPaths.contains(destURL.path) {
                         destURL = PathSanitizer.appendCounter(destURL)
                     }
@@ -266,7 +276,7 @@ class MainViewModel {
             if !NSApp.isActive {
                 let content = UNMutableNotificationContent()
                 content.title = "PixelDiet"
-                content.body = "Batch complete \u{2014} \(batchJob.completedCount) images compressed"
+                content.body = "Batch complete - \(batchJob.completedCount) images compressed"
                 content.sound = .default
                 let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
                 try? await UNUserNotificationCenter.current().add(request)
@@ -276,6 +286,16 @@ class MainViewModel {
 
     func cancelCompression() {
         processingTask?.cancel()
+        processingTask = nil
+        batchJob.isProcessing = false
+        batchJob.finishRun()
+        NSApp.dockTile.badgeLabel = nil
+
+        // Mark still-processing items as failed
+        for item in batchJob.items where item.status == .processing {
+            item.status = .failed(error: "Cancelled")
+            batchJob.recordCompletion(status: .failed(error: "Cancelled"), originalSize: item.originalSize, compressedSize: nil)
+        }
     }
 
     // MARK: - Retry Failed
@@ -293,7 +313,7 @@ class MainViewModel {
             item.status = .processing
         }
 
-        let settingsSnap = settings.snapshot()
+        guard let settingsSnap = settings.snapshot() else { return }
         var reservedPaths = Set<String>(batchJob.items.compactMap { $0.destinationURL?.path })
         var tasks: [ImageTask] = []
 

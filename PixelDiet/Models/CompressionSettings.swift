@@ -30,16 +30,18 @@ class CompressionSettings {
         }
     }
 
-    /// Create a Sendable snapshot for actor boundary crossing
-    func snapshot() -> SettingsSnapshot {
-        SettingsSnapshot(
+    /// Create a Sendable snapshot for actor boundary crossing.
+    /// Caller must ensure outputDirectory is non-nil before calling.
+    func snapshot() -> SettingsSnapshot? {
+        guard let outputDirectory else { return nil }
+        return SettingsSnapshot(
             outputFormat: outputFormat,
             quality: quality,
             maxDimension: maxDimension,
             preserveDirectoryStructure: preserveDirectoryStructure,
             stripMetadata: stripMetadata,
             skipIfLarger: skipIfLarger,
-            outputDirectory: outputDirectory!
+            outputDirectory: outputDirectory
         )
     }
 }

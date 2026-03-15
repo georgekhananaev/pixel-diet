@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SettingsWindow: View {
     @Bindable var settings: CompressionSettings
-    @State private var settingsVM = SettingsViewModel()
 
     var body: some View {
         TabView {
@@ -12,10 +11,6 @@ struct SettingsWindow: View {
                 }
         }
         .frame(width: 450, height: 380)
-        .onAppear {
-            // Sync from persisted defaults into the provided settings
-            settingsVM.loadSettings()
-        }
     }
 
     private var generalTab: some View {

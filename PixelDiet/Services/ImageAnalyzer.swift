@@ -1,10 +1,10 @@
 import Foundation
 import ImageIO
 
-/// CRITICAL: Must be `nonisolated` — runs in TaskGroup child tasks for file discovery.
+/// CRITICAL: Must be `nonisolated` - runs in TaskGroup child tasks for file discovery.
 /// Without this, all image analysis serializes on MainActor. (Round 3 Fix)
 nonisolated struct ImageAnalyzer: ImageAnalyzing {
-    /// Must also be `nonisolated` — returned from background tasks
+    /// Must also be `nonisolated` - returned from background tasks
     nonisolated struct ImageInfo: Sendable {
         let fileSize: Int64
         let dimensions: CGSize

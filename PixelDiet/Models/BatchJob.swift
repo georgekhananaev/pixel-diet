@@ -156,7 +156,7 @@ class BatchJob {
         }
     }
 
-    /// Incremental original size — updated in addItems, not computed
+    /// Incremental original size - updated in addItems, not computed
     private(set) var totalOriginalSize: Int64 = 0
 
     var processedCount: Int { totalProcessedCount }

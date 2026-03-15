@@ -131,10 +131,15 @@ struct ImagePreviewView: View, Equatable {
         }
         .frame(width: 700, height: 500)
         .task {
-            originalImage = NSImage(contentsOf: item.sourceURL)
-            if let destURL = item.destinationURL {
-                compressedImage = NSImage(contentsOf: destURL)
-            }
+            let sourceURL = item.sourceURL
+            let destURL = item.destinationURL
+            let (orig, comp) = await Task.detached {
+                let orig = NSImage(contentsOf: sourceURL)
+                let comp = destURL.flatMap { NSImage(contentsOf: $0) }
+                return (orig, comp)
+            }.value
+            originalImage = orig
+            compressedImage = comp
         }
     }
 

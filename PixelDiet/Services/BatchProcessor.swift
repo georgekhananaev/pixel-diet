@@ -14,7 +14,7 @@ actor BatchProcessor {
     }
 
     /// Process all tasks in parallel using TaskGroup.
-    /// Receives Sendable structs only — no @Observable classes cross this boundary.
+    /// Receives Sendable structs only - no @Observable classes cross this boundary.
     func process(
         tasks: [ImageTask],
         settings: SettingsSnapshot,
@@ -39,15 +39,16 @@ actor BatchProcessor {
                 if task.frameCount > 1 {
                     await onItemComplete(
                         task.id,
-                        .warning(message: "Multi-frame image — only first frame processed"),
+                        .warning(message: "Multi-frame image - only first frame processed"),
                         nil, nil
                     )
                 }
 
-                // Throttle concurrency
-                if running >= maxConcurrency {
+                // Throttle concurrency - wait for a slot to free up
+                while running >= maxConcurrency {
                     await group.next()
                     running -= 1
+                    if Task.isCancelled { break }
                 }
 
                 running += 1
@@ -80,7 +81,7 @@ actor BatchProcessor {
                             )
                         }
                     } catch {
-                        self.logger.error("Failed: \(task.sourceURL.lastPathComponent): \(error)")
+                        self.logger.error("Failed: \(task.sourceURL.path) -> \(error.localizedDescription)")
                         await onItemComplete(
                             task.id,
                             .failed(error: error.localizedDescription),

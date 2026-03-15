@@ -19,7 +19,7 @@ struct BatchProgressView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            // Show each run as its own row — newest first
+            // Show each run as its own row - newest first
             ForEach(batchJob.runHistory.reversed()) { run in
                 RunRow(
                     run: run,
@@ -81,7 +81,7 @@ struct RunRow: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            // Header — always visible, clickable to expand
+            // Header - always visible, clickable to expand
             HStack(spacing: 8) {
                 // Expand arrow for completed runs
                 if run.isComplete {
@@ -153,7 +153,7 @@ struct RunRow: View {
                     .tint(run.failedCount > 0 ? .orange : .accentColor)
             }
 
-            // Expanded detail — clickable stats
+            // Expanded detail - clickable stats
             if isExpanded && run.isComplete {
                 HStack(spacing: 16) {
                     StatButton(
@@ -247,7 +247,7 @@ struct StatusDetailSheet: View {
                     .font(.title3)
                 Text(headerTitle)
                     .font(.headline)
-                Text("— Run #\(runId)")
+                Text("- Run #\(runId)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()

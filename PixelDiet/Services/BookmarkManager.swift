@@ -27,12 +27,16 @@ struct BookmarkManager {
         ) else { return nil }
 
         if isStale {
-            // Bookmark is stale — user needs to re-select folder
+            // Bookmark is stale - user needs to re-select folder
             UserDefaults.standard.removeObject(forKey: bookmarkKey)
             return nil
         }
 
-        guard url.startAccessingSecurityScopedResource() else { return nil }
+        guard url.startAccessingSecurityScopedResource() else {
+            // Access failed - bookmark is unusable, clear it
+            UserDefaults.standard.removeObject(forKey: bookmarkKey)
+            return nil
+        }
         return url
     }
 

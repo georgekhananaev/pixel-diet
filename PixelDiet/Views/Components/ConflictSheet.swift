@@ -69,6 +69,9 @@ struct ConflictSheet: View {
                 .padding(.bottom, 16)
         }
         .frame(width: 380, height: 340)
+        .onExitCommand {
+            onChoice(.skip)
+        }
     }
 
     private func actionButton(

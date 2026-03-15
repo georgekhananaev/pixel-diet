@@ -100,34 +100,34 @@ struct ImageListView: View {
     }
 
     private var groupedSections: [ListSection] {
-        // Group items by batchRunId
-        var sections: [ListSection] = []
+        // Group items by batchRunId in a single pass
         var pending: [ImageItem] = []
-        var runGroups: [Int: [ImageItem]] = [:]
+        var runGroups: [Int: (items: [ImageItem], completedCount: Int)] = [:]
 
         for item in viewModel.batchJob.items {
             if let runId = item.batchRunId {
-                runGroups[runId, default: []].append(item)
+                var group = runGroups[runId] ?? (items: [], completedCount: 0)
+                group.items.append(item)
+                if case .completed = item.status { group.completedCount += 1 }
+                runGroups[runId] = group
             } else {
                 pending.append(item)
             }
         }
 
-        // Pending items (not yet processed) go first with no header
+        var sections: [ListSection] = []
+
+        // Pending items first with no header
         if !pending.isEmpty {
             sections.append(ListSection(id: -1, header: nil, items: pending))
         }
 
-        // Completed runs in order, newest first
+        // Completed runs, newest first
         for runId in runGroups.keys.sorted(by: >) {
-            let items = runGroups[runId]!
-            let format = items.first?.outputFormatUsed ?? "—"
-            let completedInRun = items.filter {
-                if case .completed = $0.status { return true }
-                return false
-            }.count
-            let header = "Run #\(runId) — \(format) — \(completedInRun)/\(items.count) completed"
-            sections.append(ListSection(id: runId, header: header, items: items))
+            let group = runGroups[runId]!
+            let format = group.items.first?.outputFormatUsed ?? "-"
+            let header = "Run #\(runId) - \(format) - \(group.completedCount)/\(group.items.count) completed"
+            sections.append(ListSection(id: runId, header: header, items: group.items))
         }
 
         return sections
@@ -196,6 +196,7 @@ struct ImageListView: View {
     // MARK: - Drop
 
     private func handleDrop(providers: [NSItemProvider]) {
+        let queue = DispatchQueue(label: "com.georgekhananaev.PixelDiet.drop")
         var urls: [URL] = []
         let group = DispatchGroup()
 
@@ -204,7 +205,7 @@ struct ImageListView: View {
             group.enter()
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 if let url {
-                    urls.append(url)
+                    queue.sync { urls.append(url) }
                 }
                 group.leave()
             }
@@ -282,6 +283,7 @@ struct ImageRow: View {
             // Savings
             if let savings = item.savingsPercentage {
                 SavingsIndicator(percentage: savings)
+                    .accessibilityLabel(String(localized: "\(Int(savings)) percent savings"))
             }
 
             if let compressedSize = item.formattedCompressedSize {
@@ -290,6 +292,7 @@ struct ImageRow: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .frame(width: 65, alignment: .trailing)
+                    .accessibilityLabel(String(localized: "Compressed size \(compressedSize)"))
             }
 
             // Status badge

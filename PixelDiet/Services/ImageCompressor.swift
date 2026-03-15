@@ -18,8 +18,8 @@ nonisolated struct ImageCompressor: ImageCompressing {
             ? (task.sourceFormat ?? .jpeg)
             : settings.outputFormat
 
-        // Validate output format is available
-        guard let utType = outputFormat.utType else {
+        // Validate output format is available and can be written
+        guard outputFormat.canBeOutput, let utType = outputFormat.utType else {
             throw CompressionError.unsupportedFormat(outputFormat.displayName)
         }
 
@@ -32,12 +32,19 @@ nonisolated struct ImageCompressor: ImageCompressing {
         let frameCount = CGImageSourceGetCount(source)
         if frameCount > 1 {
             logger.warning("Multi-frame image (\(frameCount) frames): \(task.sourceURL.lastPathComponent)")
-            // Process only first frame — caller should have warned user
+            // Process only first frame - caller should have warned user
         }
 
         // 3. Read original metadata and ICC profile (without loading full CGImage)
         let sourceProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         let iccProfileData = extractICCProfileData(from: source)
+
+        // 3b. Early dimension validation - fail fast before expensive resize
+        let srcWidth = sourceProperties?[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let srcHeight = sourceProperties?[kCGImagePropertyPixelHeight] as? Int ?? 0
+        guard srcWidth > 0 && srcHeight > 0 else {
+            throw CompressionError.invalidDimensions
+        }
 
         // 4. Handle metadata
         var outputMetadata: [CFString: Any]? = nil
@@ -63,7 +70,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
                 applyOrientation: true
             )
         } else {
-            // No resize, no metadata strip — load image as-is
+            // No resize, no metadata strip - load image as-is
             guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
                 throw CompressionError.cannotReadImage
             }
@@ -119,7 +126,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
             )
         }
 
-        // 9. Atomic move — try moveItem first, fall back to replaceItemAt
+        // 9. Atomic move - try moveItem first, fall back to replaceItemAt
         let finalURL: URL
         do {
             try FileManager.default.moveItem(at: tempURL, to: destURL)
@@ -143,7 +150,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
     // MARK: - Memory-Efficient Resize
 
     /// Uses CGImageSourceCreateThumbnailAtIndex for memory-efficient downsampling.
-    /// This avoids loading the full-resolution bitmap — ImageIO downsamples during decode.
+    /// This avoids loading the full-resolution bitmap - ImageIO downsamples during decode.
     private func resizeMemoryEfficient(
         source: CGImageSource,
         maxDimension: Int,
@@ -158,7 +165,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
         if maxDimension > 0 {
             options[kCGImageSourceThumbnailMaxPixelSize] = maxDimension
         } else {
-            // No resize — just decode with orientation applied
+            // No resize - just decode with orientation applied
             let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
             let width = props?[kCGImagePropertyPixelWidth] as? Int ?? 0
             let height = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
@@ -276,7 +283,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
         let alphaInfo = image.alphaInfo
         let hasAlpha = !(alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast)
 
-        // 1. Configure encoder — method 4 balances speed and compression
+        // 1. Configure encoder - method 4 balances speed and compression
         var config = WebPConfig()
         guard WebPConfigInit(&config) != 0 else {
             throw CompressionError.writeFailed
@@ -301,6 +308,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
         // 3. Set up memory writer
         var writer = WebPMemoryWriter()
         WebPMemoryWriterInit(&writer)
+        defer { WebPMemoryWriterClear(&writer) }
         picture.writer = WebPMemoryWrite
         withUnsafeMutablePointer(to: &writer) { ptr in
             picture.custom_ptr = UnsafeMutableRawPointer(ptr)
@@ -309,6 +317,9 @@ nonisolated struct ImageCompressor: ImageCompressing {
         // 4. Render CGImage to raw pixel buffer
         let bytesPerRow = Int(width) * 4
         let totalBytes = bytesPerRow * Int(height)
+        guard totalBytes > 0, totalBytes / 4 == Int(width) * Int(height) else {
+            throw CompressionError.invalidDimensions
+        }
         let rawData = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBytes)
         defer { rawData.deallocate() }
 
@@ -316,7 +327,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
             throw CompressionError.writeFailed
         }
 
-        // For non-alpha: use noneSkipLast (skip the 4th byte — faster, no alpha processing)
+        // For non-alpha: use noneSkipLast (skip the 4th byte - faster, no alpha processing)
         // For alpha: use premultipliedLast (CGContext requirement; libwebp handles it)
         let bitmapInfo: UInt32 = hasAlpha
             ? (CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
@@ -341,7 +352,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
         if hasAlpha {
             importResult = WebPPictureImportRGBA(&picture, rawData, Int32(bytesPerRow))
         } else {
-            // RGBX: 4-byte stride but ignores the X channel — avoids alpha overhead
+            // RGBX: 4-byte stride but ignores the X channel - avoids alpha overhead
             importResult = WebPPictureImportRGBX(&picture, rawData, Int32(bytesPerRow))
         }
 
@@ -354,19 +365,17 @@ nonisolated struct ImageCompressor: ImageCompressing {
             throw CompressionError.writeFailed
         }
 
-        // 7. Write to disk
+        // 7. Write to disk (WebPMemoryWriterClear handled by defer above)
         guard let encodedData = writer.mem, writer.size > 0 else {
-            WebPMemoryWriterClear(&writer)
             throw CompressionError.writeFailed
         }
 
         let data = Data(bytes: encodedData, count: writer.size)
-        WebPMemoryWriterClear(&writer)
         try data.write(to: url)
     }
 }
 
-/// Must be `nonisolated` — returned from background compression tasks (Round 3 Fix)
+/// Must be `nonisolated` - returned from background compression tasks (Round 3 Fix)
 nonisolated struct CompressionResult: Sendable {
     let outputURL: URL
     let outputSize: Int64

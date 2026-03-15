@@ -270,7 +270,7 @@ struct HelpView: View {
                         "Add multiple images, then click **Compress** to process them all. Progress is shown in the bottom panel with per-file status.")
 
                     helpSection("Keyboard Shortcuts",
-                        "**Cmd+O** \u{2014} Add Images\n**Cmd+R** \u{2014} Compress All\n**Cmd+.** \u{2014} Cancel\n**Delete** \u{2014} Remove Selected\n**Cmd+,** \u{2014} Settings")
+                        "**Cmd+O** - Add Images\n**Cmd+R** - Compress All\n**Cmd+.** - Cancel\n**Delete** - Remove Selected\n**Cmd+,** - Settings")
 
                     helpSection("Contact",
                         "Email: george@khananaev.com")
