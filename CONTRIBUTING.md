@@ -25,7 +25,7 @@ By submitting a contribution (pull request, patch, or suggestion), you agree to 
 
 - **macOS 14.0+** (Sonoma)
 - **Xcode 16+** with Swift 6.2 support
-- No external dependencies to install — everything is built-in
+- No external dependencies to install - everything is built-in
 
 ## Project Structure
 
@@ -48,16 +48,16 @@ This project uses Swift 6.2 Approachable Concurrency with `SWIFT_DEFAULT_ACTOR_I
 
 - All types are **implicitly `@MainActor`** unless explicitly marked otherwise
 - Services that run in background `TaskGroup` child tasks **must** be marked `nonisolated` (e.g., `ImageCompressor`, `ImageAnalyzer`, `PathSanitizer`)
-- `@Observable` classes **never cross actor boundaries** — use `Sendable` structs (`ImageTask`, `SettingsSnapshot`) instead
+- `@Observable` classes **never cross actor boundaries** - use `Sendable` structs (`ImageTask`, `SettingsSnapshot`) instead
 - Error types and result types thrown/returned from background tasks must be `nonisolated` and `Sendable`
 
 ### General Rules
 
-- **No external dependencies** — use only Apple frameworks (exception: libwebp for WebP encoding)
-- **App Sandbox** — all file access must go through `NSOpenPanel` or security-scoped bookmarks
-- **Memory efficiency** — use `CGImageSourceCreateThumbnailAtIndex` for resizing, never load full bitmaps when avoidable
-- **Atomic writes** — always write to temp file first, then atomic move
-- **Localization ready** — use `String(localized:)` for all user-facing strings
+- **No external dependencies** - use only Apple frameworks (exception: libwebp for WebP encoding)
+- **App Sandbox** - all file access must go through `NSOpenPanel` or security-scoped bookmarks
+- **Memory efficiency** - use `CGImageSourceCreateThumbnailAtIndex` for resizing, never load full bitmaps when avoidable
+- **Atomic writes** - always write to temp file first, then atomic move
+- **Localization ready** - use `String(localized:)` for all user-facing strings
 - Follow existing code style and naming conventions
 
 ### What Not to Do

@@ -5,8 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 ## [Unreleased]
 
 ### Added
-- **assets**: Custom app icon — gradient feather (red/orange to teal/green) on dark grid background with color-matched glows
-- **ui**: Per-run history tracking — each compression run shows as collapsible row with format, quality level, stats, and elapsed time
+- **assets**: Custom app icon - gradient feather (red/orange to teal/green) on dark grid background with color-matched glows
+- **ui**: Per-run history tracking - each compression run shows as collapsible row with format, quality level, stats, and elapsed time
 - **ui**: Conflict resolution sheet with 6 options (overwrite/rename/skip, each with "apply to all" variant)
 - **ui**: Context menus on image rows (Reveal in Finder, Copy Path, Reveal Output, Remove)
 - **ui**: Ellipsis menu button on each image row for quick actions
@@ -35,7 +35,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **ui**: Menu bar Cmd+O now triggers file picker via NotificationCenter
 - **ui**: Settings panel scroll improvements
 
-- **perf**: Rewrite WebP encoder using advanced libwebp API (WebPConfig + WebPMemoryWriter) — 2-3x faster encoding
+- **perf**: Rewrite WebP encoder using advanced libwebp API (WebPConfig + WebPMemoryWriter) - 2-3x faster encoding
 - **perf**: Use RGBX import for opaque images, skip alpha channel processing
 - **perf**: Switch ImageListView from ScrollView+LazyVStack to native List for instant selection
 - **ui**: Wider settings sidebar (280-400px, was 220-320px)

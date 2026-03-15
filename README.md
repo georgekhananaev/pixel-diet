@@ -5,7 +5,7 @@
 <h1 align="center">PixelDiet</h1>
 
 <p align="center">
-  <strong>Bulk image compression for Mac — fast, native, private.</strong>
+  <strong>Bulk image compression for Mac - fast, native, private.</strong>
 </p>
 
 <p align="center">
@@ -17,25 +17,25 @@
 
 ---
 
-PixelDiet is a native macOS application for batch image compression, resizing, and format conversion. Drop hundreds of images and watch them shrink — using all your CPU cores.
+PixelDiet is a native macOS application for batch image compression, resizing, and format conversion. Drop hundreds of images and watch them shrink - using all your CPU cores.
 
-Built entirely with Apple's native frameworks (ImageIO, CoreImage, vImage) plus libwebp for WebP encoding. Zero external dependencies, fully sandboxed, fully offline — your images never leave your Mac.
+Built entirely with Apple's native frameworks (ImageIO, CoreImage, vImage) plus libwebp for WebP encoding. Zero external dependencies, fully sandboxed, fully offline - your images never leave your Mac.
 
 ## Features
 
-- **Drag & Drop** — Drop files or folders onto the app window
-- **Batch Processing** — Process hundreds of images concurrently across all CPU cores
-- **Format Conversion** — Convert between JPEG, PNG, WebP, HEIC, HEIF, AVIF, TIFF, BMP, and GIF
-- **11 Input Formats** — PNG, JPEG, WebP, HEIC, HEIF, AVIF, TIFF, BMP, GIF, PPM + extensionless files via content sniffing
-- **Quality Control** — Adjustable quality slider (10–100) with format-appropriate encoding
-- **Smart Resize** — Max dimension (longest edge) with Lanczos resampling, preserving aspect ratio
-- **EXIF Strip** — Remove metadata by default to protect privacy (GPS, camera info)
-- **Smart Skip** — Automatically skip files that would get larger after compression
-- **Before/After Preview** — Side-by-side comparison with file size savings
-- **Conflict Resolution** — Per-file overwrite/rename/skip dialogs with "apply to all"
-- **Run History** — Per-run stats with format, quality, elapsed time, and savings breakdown
-- **Directory Preservation** — Output mirrors input folder structure
-- **Fully Offline** — No network access, no analytics, no tracking
+- **Drag & Drop** - Drop files or folders onto the app window
+- **Batch Processing** - Process hundreds of images concurrently across all CPU cores
+- **Format Conversion** - Convert between JPEG, PNG, WebP, HEIC, HEIF, AVIF, TIFF, BMP, and GIF
+- **11 Input Formats** - PNG, JPEG, WebP, HEIC, HEIF, AVIF, TIFF, BMP, GIF, PPM + extensionless files via content sniffing
+- **Quality Control** - Adjustable quality slider (10-100) with format-appropriate encoding
+- **Smart Resize** - Max dimension (longest edge) with Lanczos resampling, preserving aspect ratio
+- **EXIF Strip** - Remove metadata by default to protect privacy (GPS, camera info)
+- **Smart Skip** - Automatically skip files that would get larger after compression
+- **Before/After Preview** - Side-by-side comparison with file size savings
+- **Conflict Resolution** - Per-file overwrite/rename/skip dialogs with "apply to all"
+- **Run History** - Per-run stats with format, quality, elapsed time, and savings breakdown
+- **Directory Preservation** - Output mirrors input folder structure
+- **Fully Offline** - No network access, no analytics, no tracking
 
 ## Requirements
 
@@ -75,11 +75,11 @@ Services (actors + nonisolated structs)
 ImageIO / CoreImage / vImage / libwebp
 ```
 
-- **`@Observable` classes** stay on `@MainActor` — never cross actor boundaries
+- **`@Observable` classes** stay on `@MainActor` - never cross actor boundaries
 - **`Sendable` structs** (`ImageTask`, `SettingsSnapshot`) carry data to background services
 - **`nonisolated` services** (`ImageCompressor`, `ImageAnalyzer`, `PathSanitizer`) run in `TaskGroup` child tasks without hopping to MainActor
 - **`BatchProcessor` actor** orchestrates parallel compression with adaptive memory-budget-based concurrency
-- **Memory-efficient resizing** via `CGImageSourceCreateThumbnailAtIndex` — never loads full-resolution bitmaps
+- **Memory-efficient resizing** via `CGImageSourceCreateThumbnailAtIndex` - never loads full-resolution bitmaps
 
 ## Supported Formats
 
@@ -115,12 +115,12 @@ PixelDiet collects no data. It makes no network requests. All image processing h
 
 ## License
 
-**Non-Commercial Open Source License** — see [LICENSE](LICENSE) for full terms.
+**Non-Commercial Open Source License** - see [LICENSE](LICENSE) for full terms.
 
 You may use, study, modify, and redistribute for personal, educational, or non-commercial purposes. Commercial use, App Store distribution, and reselling are prohibited without written permission from the author.
 
 ## Author
 
-**George Khananaev** — [LinkedIn](https://www.linkedin.com/in/georgekhananaev/)
+**George Khananaev** - [LinkedIn](https://www.linkedin.com/in/georgekhananaev/)
 
 For commercial licensing inquiries, contact via LinkedIn.
