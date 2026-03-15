@@ -36,7 +36,7 @@ struct MainView: View {
                     }
                 }
             }
-            .frame(minWidth: 400, minHeight: 300)
+            .frame(minWidth: 600, minHeight: 450)
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -133,8 +133,27 @@ struct MainView: View {
                 }
             )
         }
-        .frame(minWidth: 600, minHeight: 400)
-        .navigationTitle(dynamicTitle)
+        .frame(minWidth: 900, minHeight: 600)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: 6) {
+                    Image("AppIconClean")
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
+                    Text(dynamicTitle)
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 12)
+                .allowsHitTesting(false)
+            }
+        }
+        .navigationTitle("")
+        .onReceive(NotificationCenter.default.publisher(for: .addImages)) { _ in
+            presentOpenPanel()
+        }
     }
 
     private var dynamicTitle: String {
@@ -167,3 +186,6 @@ struct MainView: View {
         }
     }
 }
+
+// MARK: - Window Icon Setter
+

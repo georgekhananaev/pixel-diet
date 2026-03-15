@@ -188,6 +188,8 @@ struct SettingsPanel: View {
             }
         }
         .formStyle(.grouped)
+        .scrollIndicators(.automatic)
+        .scrollContentBackground(.hidden)
     }
 
     private func chooseOutputFolder() {
