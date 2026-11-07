@@ -1,94 +1,96 @@
 #!/usr/bin/env python3
-"""Generate the PixelDiet app icon: a mosaic of pixels that slim down from the top left to the bottom right.
+"""Build the PixelDiet app icon from its artwork: a 1024 x 1024 SVG or PNG with a transparent background.
 
 Writes, relative to the repository root (or to --out for previews):
-  PixelDiet/AppIcon.icon/                              Icon Composer icon (macOS 26+; Xcode derives
-                                                       the macOS 14/15 icon from it)
+  PixelDiet/AppIcon.icon/                              Icon Composer icon: the artwork as a flat layer
+                                                       on a navy gradient (macOS 26+; Xcode derives the
+                                                       macOS 14/15 icon from it)
   PixelDiet/Assets.xcassets/AppIconClean.imageset/icon_clean.png
                                                        full-bleed copy for the window toolbar
 
-Requires Pillow and NumPy (the committed icon was made with Pillow 11.3.0 and NumPy 2.3.1):
-  python3 scripts/generate_app_icon.py [--out DIR]
+Requires Pillow, and rsvg-convert (brew install librsvg) for SVG artwork:
+  python3 scripts/generate_app_icon.py docs/media/logo-agy04-noborder.png [--out DIR]
+The current artwork is also kept as PixelDiet/AppIcon.icon/Assets/artwork.png, which works as input too.
 """
 
 import argparse
+import io
 import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
-import numpy as np
 from PIL import Image, ImageDraw
 
 SIZE = 1024
-BACKGROUND = (12, 16, 40)
-GRID = 10  # pixels per row and column (large enough to stay visible at 32 px); the mosaic runs to the icon's edges
-PITCH = SIZE / GRID
-LARGEST, SMALLEST = 0.90, 0.24  # pixel size as a share of the pitch, top left and bottom right
-
-PALETTE = [(0.00, (255, 60, 95)), (0.18, (255, 95, 75)), (0.36, (255, 150, 60)), (0.50, (255, 205, 60)),
-           (0.64, (170, 220, 70)), (0.80, (70, 200, 130)), (1.00, (45, 160, 215))]
+# The plate the artwork was drawn on: lighter at the top, darker at the bottom
+TOP, BOTTOM = (30, 45, 71), (13, 20, 35)
 
 
-def lerp_color(stops, t):
-    t = min(max(t, 0.0), 1.0)
-    for (t0, c0), (t1, c1) in zip(stops, stops[1:]):
-        if t0 <= t <= t1:
-            f = (t - t0) / (t1 - t0)
-            return tuple(round(a + (b - a) * f) for a, b in zip(c0, c1))
-    return stops[-1][1]
+def srgb(color):
+    return "srgb:" + ",".join(f"{c / 255:.5f}" for c in color) + ",1.00000"
 
 
-def mosaic():
-    """The Icon Composer layer: rounded pixels on a transparent canvas, shrinking along the diagonal."""
-    image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    rng = np.random.default_rng(21)
-    for row in range(GRID):
-        for col in range(GRID):
-            t = (row + col) / (2 * (GRID - 1))  # 0 at the top left, 1 at the bottom right
-            side = PITCH * (LARGEST - (LARGEST - SMALLEST) * t ** 1.25)
-            shade = 1 + rng.uniform(-0.04, 0.04)  # slight variation, like real pixels
-            color = tuple(min(255, round(c * shade)) for c in lerp_color(PALETTE, t))
-            cx, cy = (col + 0.5) * PITCH, (row + 0.5) * PITCH
-            draw.rounded_rectangle([cx - side / 2, cy - side / 2, cx + side / 2, cy + side / 2],
-                                   radius=side * 0.24, fill=(*color, 255))
+def icon_json(layer):
+    fill = {
+        "linear-gradient": [srgb(TOP), srgb(BOTTOM)],
+        "orientation": {"start": {"x": 0.5, "y": 0}, "stop": {"x": 0.5, "y": 1}},
+    }
+    return {
+        # Dark icons keep the plate too; macOS would otherwise replace it with gray
+        "fill-specializations": [{"value": fill}, {"appearance": "dark", "value": fill}],
+        # The artwork has its own lighting; Liquid Glass on top of it would add a second highlight
+        "groups": [{"layers": [{"image-name": layer, "name": "artwork", "glass": False}]}],
+        "supported-platforms": {"squares": ["macOS"]},
+    }
+
+
+def raster(artwork, data):
+    """The artwork (its path and bytes) as a SIZE x SIZE RGBA image."""
+    if artwork.suffix.lower() == ".svg":
+        if not shutil.which("rsvg-convert"):
+            sys.exit("rsvg-convert not found: brew install librsvg")
+        data = subprocess.run(["rsvg-convert", "-w", str(SIZE), "-h", str(SIZE)],
+                              input=data, check=True, capture_output=True).stdout
+    image = Image.open(io.BytesIO(data))
+    if image.size != (SIZE, SIZE) or image.mode != "RGBA":
+        sys.exit(f"{artwork}: expected {SIZE} x {SIZE} with transparency, got {image.size[0]} x {image.size[1]} {image.mode}")
     return image
 
 
-def flattened(layer, size):
-    """Full-bleed rounded icon (background + layer), as used in the toolbar."""
-    image = Image.new("RGBA", (SIZE, SIZE), (*BACKGROUND, 255))
-    image.alpha_composite(layer)
+def flattened(artwork, size):
+    """Full-bleed rounded icon (gradient + artwork), as used in the toolbar."""
+    gradient = Image.linear_gradient("L").resize((SIZE, SIZE))
+    image = Image.composite(Image.new("RGBA", (SIZE, SIZE), (*BOTTOM, 255)),
+                            Image.new("RGBA", (SIZE, SIZE), (*TOP, 255)), gradient)
+    image.alpha_composite(artwork)
     mask = Image.new("L", (SIZE, SIZE), 0)
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, SIZE - 1, SIZE - 1], radius=round(SIZE * 0.2237), fill=255)
     image.putalpha(mask)
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def icon_json():
-    r, g, b = (c / 255 for c in BACKGROUND)
-    return {
-        "fill": {"automatic-gradient": f"srgb:{r:.5f},{g:.5f},{b:.5f},1.00000"},
-        # Flat pixels: Liquid Glass on every small square reads as beads
-        "groups": [{"layers": [{"image-name": "pixels.png", "name": "pixels", "glass": False}]}],
-        "supported-platforms": {"squares": ["macOS"]},
-    }
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("artwork", type=Path, help=f"{SIZE} x {SIZE} SVG or PNG with a transparent background")
     parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parent.parent,
                         help="root to write into (default: the repository)")
-    root = parser.parse_args().out
+    args = parser.parse_args()
 
-    layer = mosaic()
-    icon_dir = root / "PixelDiet" / "AppIcon.icon"
-    (icon_dir / "Assets").mkdir(parents=True, exist_ok=True)
-    layer.save(icon_dir / "Assets" / "pixels.png")
-    (icon_dir / "icon.json").write_text(json.dumps(icon_json(), indent=2) + "\n")
+    data = args.artwork.read_bytes()  # read up front: the artwork may be the layer this run replaces
+    image = raster(args.artwork, data)
+    layer = "artwork" + args.artwork.suffix.lower()
 
-    clean_dir = root / "PixelDiet" / "Assets.xcassets" / "AppIconClean.imageset"
+    icon_dir = args.out / "PixelDiet" / "AppIcon.icon"
+    shutil.rmtree(icon_dir / "Assets", ignore_errors=True)  # drop layers of earlier artwork
+    (icon_dir / "Assets").mkdir(parents=True)
+    (icon_dir / "Assets" / layer).write_bytes(data)
+    (icon_dir / "icon.json").write_text(json.dumps(icon_json(layer), indent=2) + "\n")
+
+    clean_dir = args.out / "PixelDiet" / "Assets.xcassets" / "AppIconClean.imageset"
     clean_dir.mkdir(parents=True, exist_ok=True)
-    flattened(layer, 256).save(clean_dir / "icon_clean.png")
+    flattened(image, 256).save(clean_dir / "icon_clean.png")
     print(f"Wrote {icon_dir} and {clean_dir / 'icon_clean.png'}")
 
 

@@ -7,7 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 ## [1.1.0] - 2026-11-04
 
 ### Added
-- **app**: New app icon, a mosaic of rainbow pixels that slim down from big to tiny (pixels on a diet), made with Icon Composer and filling the whole icon shape: macOS 26 and later show it in the system icon shape and styles (default, dark, tinted), and macOS 14 and 15 get a matching icon generated from it
+- **app**: New app icon, rainbow pixel blocks pinched toward a glowing center, on a navy plate, made with Icon Composer and filling the whole icon shape: macOS 26 and later show it in the system icon shape and styles (the navy plate stays in Dark Mode), and macOS 14 and 15 get a matching icon generated from it
 - **docs**: SUPPORT.md with contact details and answers to common questions (the App Store support page)
 - **privacy**: PrivacyInfo.xcprivacy declaring UserDefaults (CA92.1) and file metadata of user-selected files (3B52.1)
 - **privacy**: PRIVACY.md privacy policy, linked from the Help menu

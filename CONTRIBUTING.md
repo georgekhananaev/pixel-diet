@@ -26,6 +26,7 @@ By submitting a contribution (pull request, patch, or suggestion), you agree to 
 - **macOS 14.0+** (Sonoma)
 - **Xcode 26+** with Swift 6.2 support
 - No dependencies to install manually - Xcode resolves the libwebp package automatically
+- App icon: `python3 scripts/generate_app_icon.py <artwork>` rebuilds `PixelDiet/AppIcon.icon` and the toolbar copy from a 1024 x 1024 PNG or SVG with a transparent background (needs Pillow; SVG also needs `rsvg-convert`). The current artwork is `PixelDiet/AppIcon.icon/Assets/artwork.png`
 
 ## Project Structure
 
