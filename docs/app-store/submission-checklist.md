@@ -10,9 +10,9 @@ Remaining steps need your Apple Developer account, App Store Connect, your authe
 - [x] The archived app launches straight into its window with no sandbox denials, errors, faults or crash reports.
 - [x] Unit tests (SwiftPM harness with the Xcode 27.1 toolchain, 2026-10-21): 102 tests, three consecutive runs, all pass except the plural-text test, which needs the app host; the plurals were checked in the built app instead.
 - [x] Privacy policy URL returns 200 (pushed 2026-10-20). The updated `PRIVACY.md` in your working tree is published with your next push.
-- [x] Screenshots captured from the real app on 2026-11-07, with the final mosaic icon: `docs/app-store/screenshots/` (2880 x 1800 Retina, no alpha).
+- [x] Screenshots captured from the real app on 2026-11-07, with the final `logo-agy04` icon in the toolbar: `docs/app-store/screenshots/` (2880 x 1800 Retina, no alpha).
 - [x] Full test plan in Xcode on 2026-11-04: 119 tests, 117 passed, 0 failed, 2 skipped by design (screenshot capture, external-volume test) - every unit test in the sandboxed host (including the macOS 27 open-panel guard), 9 UI journeys including window reopen, the Help menu and the accessibility audit in Light and Dark Mode. 0 compiler warnings.
-- [x] New Icon Composer icon (`PixelDiet/AppIcon.icon`) compiled into the app: macOS 26 draws it filling the icon shape; the macOS 14/15 renditions (16-1024 px) are in `Assets.car`.
+- [x] New Icon Composer icon (`PixelDiet/AppIcon.icon`, your `logo-agy04` artwork on a navy plate) compiles without warnings (2026-11-07): macOS 26 draws it filling the icon shape in light and dark icon styles; the macOS 14/15 renditions (16-1024 px) are in `Assets.car`.
 
 ## 1. Tests and screenshots (done; repeat before each release)
 

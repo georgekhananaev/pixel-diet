@@ -156,7 +156,7 @@ App Sandbox Information is not asked: PixelDiet uses no temporary-exception enti
 
 ## Screenshots (Mac, 16:10, 1-10 images, no alpha)
 
-Upload the five captures of the real app window in `docs/app-store/screenshots/`, made by the `AppStoreScreenshots` UI test on 2026-11-07 (with the final mosaic icon) at 2880 x 1800 (Retina, 16:10), RGB without alpha:
+Upload the five captures of the real app window in `docs/app-store/screenshots/`, made by the `AppStoreScreenshots` UI test on 2026-11-07 (with the final icon in the toolbar) at 2880 x 1800 (Retina, 16:10), RGB without alpha:
 
 1. `01-drop-zone.png` - empty window with drop zone and settings sidebar (light)
 2. `02-queue.png` - 12 photos queued with thumbnails (light)

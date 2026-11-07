@@ -20,7 +20,7 @@ See [`submission-checklist.md`](submission-checklist.md).
 | UI tests on the real sandboxed app | 2026-11-04: 9 passed (compress/preview/conflicts, rename and retry, cancel, persistence, About/Help/Settings, window reopen, accessibility audit in Light and Dark Mode, launch), 1 skipped by design (screenshot capture, run separately) |
 | Release archive | 1.1.0 (2), rebuilt 2026-11-04: universal (x86_64 + arm64), min macOS 14.0, SDK 27.0 (Xcode 27.1), hardened runtime, sandbox entitlements only, no quarantine attribute, Icon Composer icon compiled into `Assets.car` |
 | Archived app launch | 2026-11-04: opens its window; no sandbox denials, errors, faults or crash reports; quits cleanly |
-| Screenshots | 5 real-app captures from 2026-11-07 with the final mosaic icon in the toolbar, 2880×1800 (Retina, 16:10), RGB without alpha |
+| Screenshots | 5 real-app captures from 2026-11-07 with the final icon in the toolbar, 2880×1800 (Retina, 16:10), RGB without alpha |
 | Privacy policy and support URLs | Privacy policy returns 200; the updated text and `SUPPORT.md` go live with your next push |
 | Independent code review | Phase 1: 5 Important fixed. Phase 2: 1 Critical (WebP transparency) and 5 of 10 Minor fixed with tests. Phase 3: every deferred minor closed; its review (1 Important, 9 Minor) fixed with tests except 2 Minor recorded below. Phase 4: review found 1 Important (the output-folder rule was stated backwards in the app and in `SUPPORT.md`) and 9 Minor; all fixed, the Important one test-first |
 
@@ -56,7 +56,7 @@ PixelDiet is a single-window, sandboxed SwiftUI/AppKit batch image compressor. Y
 | Category | Yes | Xcode: Photography; App Store Connect: Photo & Video (Apple has no "Photography" category there). |
 | libwebp BSD-3 notice | License condition | Shown in About → Acknowledgements (UI-tested). |
 | App icon | Yes | Icon Composer icon (`AppIcon.icon`, no Apple-like motif): macOS 26+ draws it in the system shape and styles, and Xcode generates the 16-1024 px icon for macOS 14/15 into `Assets.car` plus `AppIcon.icns`. |
-| Trademarks (5.2.5) | Yes | The 1.0.0 icon, a rainbow-striped apple with a leaf, resembled Apple's logo; replaced by a mosaic of rainbow pixels that slim down from big to tiny (pixels on a diet). |
+| Trademarks (5.2.5) | Yes | The 1.0.0 icon, a rainbow-striped apple with a leaf, resembled Apple's logo; replaced by rainbow pixel blocks pinched toward a glowing center, on a navy plate. |
 | Support URL with contact details (1.5) | Yes | `SUPPORT.md`: email, bug reports, FAQ (live once pushed). |
 
 ## Issues found and fixed
@@ -137,7 +137,7 @@ Every fix below except R5 has a test that failed before the fix. R5 is a view-on
 
 **Found in the Phase 4 pass (2026-10-23 to 2026-11-04, fresh compliance scan against Apple's current rules)**
 
-- **Icon resembling Apple's logo (Guideline 5.2.5):** the 1.0.0 icon was a rainbow-striped apple with a leaf. On your decision it is now a mosaic of rainbow pixels that slim down from big to tiny (pixels on a diet), in the same palette, running to the icon's edges. (A first replacement, a pixel landscape photo, was rejected by you: it did not fill the icon and did not say "diet".)
+- **Icon resembling Apple's logo (Guideline 5.2.5):** the 1.0.0 icon was a rainbow-striped apple with a leaf. On your decision it is now rainbow pixel blocks pinched toward a glowing center, on a navy plate (your artwork `logo-agy04-noborder.png`, built into `PixelDiet/AppIcon.icon` by `scripts/generate_app_icon.py`). Earlier replacements (a pixel landscape photo, a mosaic of shrinking pixels, the arrow version `logo-agy03`) were superseded.
 - **Icon on macOS 26 and later:** the old full-canvas PNG icon was shrunk onto a gray plate, while Apple's icons fill the shape. The new icon is an Icon Composer file, so the system draws it in its own shape and in the default, dark and tinted styles. Xcode generates the macOS 14/15 icon from the same file.
 - **macOS 27 SDK open panel:** built with the macOS 27 SDK, setting the allowed file types now also decides whether files and folders are selectable (Apple's release note 6938919). Add Images listed only images and set them last, so on macOS 27, the version App Review uses, folders could no longer be picked. Folders are now an allowed type and the flags are set afterwards (`addImagesPanelAcceptsImagesAndFolders`).
 - **Output-folder message (found by the Phase 4 review):** the error said the output folder "cannot be inside the input folder", the opposite of the rule the code applies (a folder inside is allowed; the images' folder and any folder containing it are refused). The message now states the real rule and is defined once (`outputFolderMayBeInsideTheImagesFolderButNotContainIt`, RED then GREEN); the review notes and `SUPPORT.md` say the same.
@@ -246,7 +246,7 @@ Every fix below except R5 has a test that failed before the fix. R5 is a view-on
 | Files chosen directly (not in a folder) are accepted whenever ImageIO reads them, e.g. PSD or RAW, and saved as JPEG with Original | Harmless extra capability; the store copy lists only the verified formats | Folder scans pick only the listed formats |
 | The Icon Composer icon is also the source of the macOS 14/15 icon | Apple offers no supported way to ship a `.icon` file and a separate asset-catalog icon; Xcode generates the older-OS icon from the `.icon` | macOS 14/15 show Xcode's rendering of the same artwork, with a glass edge |
 | README screenshots replaced by the store screenshots | The March images showed the apple icon and outdated UI text | None |
-| The old apple icon scripts in `scripts/` (`generate_icon_v4.py`, `generate_5_icons.py`) left in place | They are untracked local files of yours; `generate_app_icon.py` makes the new icon | Running them would bring the apple back (into a folder that no longer exists) |
+| Old icon files removed (moved to the Trash, 2026-11-07) | The apple generators in `scripts/`, the superseded logo concepts and size exports in `docs/media/`, and the local 1.0.0 DMG (still attached to the v1.0.0 GitHub release); only `logo-agy04-noborder.png` and its SVG master stay in `docs/media/` | None: `generate_app_icon.py` rebuilds the icon from the artwork, also from its copy in `PixelDiet/AppIcon.icon/Assets/` |
 
 **Deferred minors** (not fixed; none blocks submission):
 - **Skipped after a file change:** when a source was replaced after it was added and is then skipped by Skip If Larger, its row keeps the old size (completed images update it).
