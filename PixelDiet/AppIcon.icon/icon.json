@@ -1,0 +1,21 @@
+{
+  "fill": {
+    "automatic-gradient": "srgb:0.04706,0.06275,0.15686,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "pixels.png",
+          "name": "pixels",
+          "glass": false
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}
