@@ -39,18 +39,19 @@ jobs:
             -scheme PixelDiet \
             -configuration Release \
             -destination 'platform=macOS' \
-            MACOSX_DEPLOYMENT_TARGET=14.0 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Run Tests
+      # Unit tests only: the UI journeys (PixelDietUITests) drive the real app for several
+      # minutes and need an interactive session, so they run locally before each release.
+      - name: Run Unit Tests
         run: |
           xcodebuild test \
             -project PixelDiet.xcodeproj \
             -scheme PixelDiet \
             -destination 'platform=macOS' \
-            MACOSX_DEPLOYMENT_TARGET=14.0 \
+            -only-testing:PixelDietTests \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
