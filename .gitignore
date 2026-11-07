@@ -8,6 +8,9 @@ scripts/skills-lock.json
 *.swp
 *~
 
+# Other IDEs
+.idea/
+
 # Xcode user data
 xcuserdata/
 *.xcuserstate
@@ -30,6 +33,8 @@ DerivedData/
 .build/
 Packages/
 Package.resolved
+# The app pins its dependency versions for reproducible release builds
+!PixelDiet.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # CocoaPods (if used)
 Pods/
@@ -48,3 +53,9 @@ fastlane/test_output/
 *.gcno
 *.gcda
 scripts/PixelDiet_Icon_1024.png
+
+# Local release builds and the retired apple icon generators (scripts/generate_app_icon.py makes the icon)
+release/
+scripts/generate_icon_v4.py
+scripts/generate_5_icons.py
+scripts/icon_pixel_dissolve_v4.png
