@@ -55,7 +55,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 - **ui**: The "Transparent areas become white" note appears only when a queued image would lose its transparency in the format it is saved in (also with Original, e.g. for transparent HEIC)
 - **ui**: Text and status colors have at least 4.5:1 contrast in Light and Dark Mode: secondary text, savings badges, run counts and status icons use darker shades in Light Mode (the system secondary label is 3.95:1 there, green about 2:1); the conflict dialog keeps standard button text with colored icons
 - **ui**: VoiceOver names for the image list and the Output Format pop-up; decorative icons are hidden from VoiceOver
-- **ci**: CI runs build, static analysis and unit tests; the UI journeys run locally before each release
+- **ci**: CI runs build, static analysis and unit tests on the macOS 26 runner (the macOS 15 image cannot compile the Icon Composer icon); the UI journeys run locally before each release
 
 ### Fixed
 - **app**: The Add Images panel keeps folders selectable when built with the macOS 27 SDK, where AppKit derives the selectable item kinds from the allowed file types

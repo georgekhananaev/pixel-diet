@@ -153,7 +153,7 @@ Every fix below except R5 has a test that failed before the fix. R5 is a view-on
 - **Docs:** Help and README are accurate.
 - **Dead code and concurrency:** dead code removed; Swift 6 data-race warnings fixed.
 - **Reproducible builds:** libwebp pinned to 1.6.0 and `Package.resolved` tracked.
-- **CI:** builds, analyzes and runs the unit tests; the UI journeys run locally before each release.
+- **CI:** builds, analyzes and runs the unit tests on the macOS 26 runner (on the macOS 15 image, actool crashes compiling the Icon Composer icon); the UI journeys run locally before each release.
 
 ## Verification
 

@@ -12,7 +12,8 @@ env:
 jobs:
   build:
     name: Build and Analyze
-    runs-on: macos-15
+    # macOS 26: Xcode's Icon Composer renderer (AppIcon.icon) crashes actool on the macOS 15 image
+    runs-on: macos-26
 
     steps:
       - name: Checkout
