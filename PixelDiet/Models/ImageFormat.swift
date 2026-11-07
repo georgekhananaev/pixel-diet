@@ -85,31 +85,23 @@ nonisolated enum ImageFormat: String, CaseIterable, Identifiable, Codable, Senda
         switch self {
         case .ppm: false
         case .webp: true  // Encoded via libwebp (bundled)
-        case .avif: Self.isEncodingAvailable(typeIdentifier: "public.avif")
+        case .avif: Self.encodableTypeIdentifiers.contains("public.avif")
         default: true
         }
     }
 
+    /// The format actually written for a source when `requested` may be `.original`
+    static func resolvedOutput(requested: ImageFormat, source: ImageFormat?) -> ImageFormat {
+        guard requested == .original else { return requested }
+        guard let source, source.canBeOutput else { return .jpeg }
+        return source
+    }
+
     /// Formats available in the output picker (excludes unsupported formats at runtime)
-    static var availableOutputFormats: [ImageFormat] {
-        allCases.filter { $0.canBeOutput }
-    }
+    static let availableOutputFormats: [ImageFormat] = allCases.filter(\.canBeOutput)
 
-    /// Check if AVIF encoding is available on this system
-    static var isAVIFEncodingAvailable: Bool {
-        isEncodingAvailable(typeIdentifier: "public.avif")
-    }
-
-    /// Check if WebP encoding is available on this system
-    static var isWebPEncodingAvailable: Bool {
-        isEncodingAvailable(typeIdentifier: "org.webmproject.webp")
-    }
-
-    /// Check if a given type identifier is supported for CGImageDestination writing
-    private static func isEncodingAvailable(typeIdentifier: String) -> Bool {
-        guard let typeIDs = CGImageDestinationCopyTypeIdentifiers() as? [String] else { return false }
-        return typeIDs.contains(typeIdentifier)
-    }
+    /// Type identifiers ImageIO can write on this Mac (looked up once)
+    private static let encodableTypeIdentifiers = Set(CGImageDestinationCopyTypeIdentifiers() as? [String] ?? [])
 
     /// Detect format from file extension
     static func from(extension ext: String) -> ImageFormat? {
@@ -146,8 +138,7 @@ nonisolated enum ImageFormat: String, CaseIterable, Identifiable, Codable, Senda
     }
 
     /// All extensions that can be used as input
-    static var allInputExtensions: Set<String> {
-        Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "avif",
-             "tiff", "tif", "bmp", "gif", "ppm"])
-    }
+    static let allInputExtensions: Set<String> = [
+        "jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "tiff", "tif", "bmp", "gif", "ppm"
+    ]
 }

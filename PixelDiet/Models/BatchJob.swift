@@ -51,7 +51,8 @@ class BatchJob {
     var items: [ImageItem] = []
     var isProcessing: Bool = false
 
-    /// Incremented each time startCompression is called
+    /// Incremented for every run and never reset, so run IDs stay unique even when
+    /// Clear All is undone after newer runs
     private(set) var currentRunId: Int = 0
 
     /// History of all runs in this session
@@ -62,38 +63,12 @@ class BatchJob {
         runHistory.last(where: { !$0.isComplete })
     }
 
-    // Aggregate counters across ALL runs
-    var totalCompletedCount: Int { runHistory.reduce(0) { $0 + $1.completedCount } }
-    var totalFailedCount: Int { runHistory.reduce(0) { $0 + $1.failedCount } }
-    var totalSkippedCount: Int { runHistory.reduce(0) { $0 + $1.skippedCount } }
-    var totalProcessedCount: Int { totalCompletedCount + totalFailedCount + totalSkippedCount }
-
-    var totalSavings: Int64 { runHistory.reduce(0) { $0 + $1.totalSavings } }
-    var totalSavingsPercentage: Double {
-        let origSize = runHistory.reduce(Int64(0)) { $0 + $1.completedOriginalSize }
-        guard origSize > 0 else { return 0 }
-        let compSize = runHistory.reduce(Int64(0)) { $0 + $1.totalCompressedSize }
-        return Double(origSize - compSize) / Double(origSize) * 100.0
-    }
-
-    // Keep these for backward compat with progress view
-    var completedCount: Int { totalCompletedCount }
-    var failedCount: Int { totalFailedCount }
-    var skippedCount: Int { totalSkippedCount }
-
     var progress: Double {
         guard let run = activeRun else {
             // If no active run, show 1.0 if we have history
             return runHistory.isEmpty ? 0 : 1.0
         }
         return run.progress
-    }
-
-    var startTime: Date? { activeRun?.startTime ?? runHistory.last?.startTime }
-    var endTime: Date? { activeRun == nil ? runHistory.last?.endTime : nil }
-
-    var elapsedTime: TimeInterval {
-        activeRun?.elapsedTime ?? runHistory.last?.elapsedTime ?? 0
     }
 
     /// Start a new run
@@ -133,32 +108,76 @@ class BatchJob {
         activeRun?.endTime = Date()
     }
 
-    /// Add items with deduplication by sourceURL
-    func addItems(_ newItems: [ImageItem]) {
-        let existingURLs = Set(items.map(\.sourceURL))
-        let unique = newItems.filter { !existingURLs.contains($0.sourceURL) }
-        items.append(contentsOf: unique)
-        totalOriginalSize += unique.reduce(0) { $0 + $1.originalSize }
+    /// Images and runs taken out of the queue by one action, with their former
+    /// positions, so Undo can put them back.
+    struct Removal {
+        fileprivate let items: [(index: Int, item: ImageItem)]
+        fileprivate let runs: [RunSummary]
+
+        var itemIDs: Set<UUID> { Set(items.map(\.item.id)) }
     }
 
-    /// Decrement failed counter before retry
-    func decrementFailed() {
-        // Find the run that has failures and decrement
-        if let run = runHistory.last(where: { $0.failedCount > 0 }) {
-            run.failedCount -= 1
-        }
-    }
-
-    /// Incremental original size - updated in addItems, not computed
+    /// Incremental original size - updated whenever items are added or removed, not computed
     private(set) var totalOriginalSize: Int64 = 0
 
-    var processedCount: Int { totalProcessedCount }
+    /// Adds images, skipping any whose file is already queued (also within `newItems`).
+    /// Returns the items actually added.
+    @discardableResult
+    func addItems(_ newItems: [ImageItem]) -> [ImageItem] {
+        var queued = Set(items.map(\.sourceURL))
+        let unique = newItems.filter { queued.insert($0.sourceURL).inserted }
+        items.append(contentsOf: unique)
+        totalOriginalSize += unique.reduce(0) { $0 + $1.originalSize }
+        return unique
+    }
 
-    func clear() {
+    @discardableResult
+    func removeItems(withIDs ids: Set<UUID>) -> Removal {
+        let removed = items.enumerated()
+            .filter { ids.contains($0.element.id) }
+            .map { (index: $0.offset, item: $0.element) }
+        items.removeAll { ids.contains($0.id) }
+        totalOriginalSize -= removed.reduce(0) { $0 + $1.item.originalSize }
+        return Removal(items: removed, runs: [])
+    }
+
+    /// Empties the queue and the run history.
+    @discardableResult
+    func clear() -> Removal {
+        let removal = Removal(items: items.enumerated().map { (index: $0.offset, item: $0.element) }, runs: runHistory)
         items.removeAll()
-        isProcessing = false
         runHistory.removeAll()
         totalOriginalSize = 0
-        currentRunId = 0
+        return removal
+    }
+
+    /// Records the size of an image's file after a run found it was replaced since it was added.
+    func updateOriginalSize(of item: ImageItem, to size: Int64) {
+        totalOriginalSize += size - item.originalSize
+        item.originalSize = size
+    }
+
+    /// Puts back what `removal` took out: images at their former positions (skipping
+    /// files that were added again since) and runs in ID order.
+    func restore(_ removal: Removal) {
+        var queued = Set(items.map(\.sourceURL))
+        for (index, item) in removal.items where queued.insert(item.sourceURL).inserted {
+            items.insert(item, at: min(index, items.count))
+            totalOriginalSize += item.originalSize
+        }
+        let knownRuns = Set(runHistory.map(\.id))
+        runHistory = (runHistory + removal.runs.filter { !knownRuns.contains($0.id) }).sorted { $0.id < $1.id }
+    }
+
+    /// Takes out again what `removal` took out (Redo), except images and the run that a batch
+    /// in progress is working on. Returns what was taken out, for the next Undo.
+    @discardableResult
+    func reapply(_ removal: Removal) -> Removal {
+        let busy = isProcessing ? Set(items.filter { $0.batchRunId == currentRunId }.map(\.id)) : []
+        let removedItems = removeItems(withIDs: removal.itemIDs.subtracting(busy)).items
+        let runIDs = Set(removal.runs.map(\.id))
+        let removedRuns = runHistory.filter { runIDs.contains($0.id) && $0.isComplete }
+        runHistory.removeAll { runIDs.contains($0.id) && $0.isComplete }
+        return Removal(items: removedItems, runs: removedRuns)
     }
 }

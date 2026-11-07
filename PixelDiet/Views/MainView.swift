@@ -1,18 +1,16 @@
 import SwiftUI
 import AppKit
-import UniformTypeIdentifiers
 
 struct MainView: View {
     @Bindable var viewModel: MainViewModel
     @Environment(\.undoManager) private var undoManager
     @State private var selectedItems: Set<UUID> = []
     @State private var previewItem: ImageItem?
-    @State private var showOverlapAlert = false
     @State private var showBatchResults = true
 
     var body: some View {
         NavigationSplitView {
-            SettingsPanel(settings: viewModel.settings, batchJob: viewModel.batchJob)
+            SettingsPanel(viewModel: viewModel)
                 .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 400)
         } detail: {
             VStack(spacing: 0) {
@@ -40,20 +38,24 @@ struct MainView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                // Cmd+O is the File ▸ Add Images… menu item
                 Button {
-                    presentOpenPanel()
+                    viewModel.presentAddImagesPanel()
                 } label: {
                     Label(String(localized: "Add Files"), systemImage: "plus")
                 }
-                .keyboardShortcut("o")
 
                 if viewModel.batchJob.isProcessing {
                     Button {
                         viewModel.cancelCompression()
                     } label: {
-                        Label(String(localized: "Cancel"), systemImage: "stop.fill")
+                        Label(
+                            viewModel.isCancelling ? String(localized: "Cancelling…") : String(localized: "Cancel"),
+                            systemImage: "stop.fill"
+                        )
                     }
                     .keyboardShortcut(".", modifiers: .command)
+                    .disabled(viewModel.isCancelling)
                 } else {
                     Button {
                         showBatchResults = true
@@ -63,9 +65,7 @@ struct MainView: View {
                     } label: {
                         let count = viewModel.batchJob.items.count
                         Label(
-                            count > 0
-                                ? String(localized: "Compress \(count) Images")
-                                : String(localized: "Compress"),
+                            count > 0 ? CountText.compressImages(count) : String(localized: "Compress"),
                             systemImage: "arrow.down.circle.fill"
                         )
                     }
@@ -73,27 +73,30 @@ struct MainView: View {
                     .disabled(viewModel.batchJob.items.isEmpty || viewModel.settings.outputDirectory == nil)
                 }
 
+                // The Delete key is handled by the list (onDeleteCommand), so text fields keep Backspace
                 if !selectedItems.isEmpty {
                     Button {
                         withAnimation {
-                            viewModel.batchJob.items.removeAll { selectedItems.contains($0.id) }
+                            viewModel.removeItems(ids: selectedItems, undoManager: undoManager)
                         }
                         selectedItems.removeAll()
                     } label: {
                         Label(String(localized: "Remove \(selectedItems.count)"), systemImage: "minus.circle")
                     }
-                    .keyboardShortcut(.delete, modifiers: [])
+                    .disabled(viewModel.batchJob.isProcessing)
                 }
 
                 if !viewModel.batchJob.items.isEmpty {
                     Button {
+                        selectedItems.removeAll()
                         viewModel.clearAll(undoManager: undoManager)
                     } label: {
                         Label(String(localized: "Clear All"), systemImage: "trash")
                     }
+                    .disabled(viewModel.batchJob.isProcessing)
                 }
 
-                if viewModel.batchJob.failedCount > 0 && !viewModel.batchJob.isProcessing {
+                if viewModel.hasFailedItems && !viewModel.batchJob.isProcessing {
                     Button {
                         Task {
                             await viewModel.retryFailed()
@@ -128,7 +131,8 @@ struct MainView: View {
         )) {
             ConflictSheet(
                 fileName: viewModel.pendingOverwriteFile ?? "",
-                onChoice: { choice in viewModel.resolveConflict(choice) }
+                onChoice: { choice in viewModel.resolveConflict(choice) },
+                onStop: { viewModel.cancelCompression() }
             )
         }
         .frame(minWidth: 900, minHeight: 600)
@@ -148,39 +152,23 @@ struct MainView: View {
                 .allowsHitTesting(false)
             }
         }
-        .navigationTitle("")
-        .onReceive(NotificationCenter.default.publisher(for: .addImages)) { _ in
-            presentOpenPanel()
-        }
+        // The window keeps its name for the Window menu, Mission Control and VoiceOver;
+        // the scene hides the plain title so the toolbar shows the icon and live title
+        .navigationTitle("PixelDiet")
     }
 
     private var dynamicTitle: String {
         let batchJob = viewModel.batchJob
         if batchJob.isProcessing {
             let pct = Int(batchJob.progress * 100)
-            return "PixelDiet - Compressing... \(pct)%"
+            return String(localized: "PixelDiet - Compressing… \(pct)%")
         } else if !batchJob.items.isEmpty {
             let count = batchJob.items.count
             let totalSize = batchJob.totalOriginalSize
             let formattedSize = ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
-            return "PixelDiet - \(count) images (\(formattedSize))"
+            return String(localized: "PixelDiet - \(CountText.images(count)) (\(formattedSize))")
         } else {
             return "PixelDiet"
-        }
-    }
-
-    private func presentOpenPanel() {
-        let panel = NSOpenPanel()
-        panel.title = String(localized: "Add Images")
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.image]
-
-        guard panel.runModal() == .OK else { return }
-
-        Task {
-            await viewModel.addFiles(urls: panel.urls)
         }
     }
 }

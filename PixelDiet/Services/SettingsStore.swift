@@ -9,8 +9,8 @@ protocol SettingsStoring {
 struct SettingsData: Codable {
     var version: Int = 1
     var outputFormat: String = "jpeg"
-    var quality: Int = 80
-    var maxDimension: Int = 1920
+    var quality: Int = Constants.defaultQuality
+    var maxDimension: Int = Constants.defaultMaxDimension
     var preserveDirectoryStructure: Bool = false
     var stripMetadata: Bool = true
     var skipIfLarger: Bool = true

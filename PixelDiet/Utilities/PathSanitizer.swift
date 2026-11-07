@@ -23,10 +23,12 @@ nonisolated struct PathSanitizer {
                 .appendingPathComponent(relativeDir)
                 .appendingPathComponent(fileName)
 
-            // Security: verify destination is still within output directory
-            let resolvedDest = destURL.standardizedFileURL.path
-            let resolvedOutput = outputDir.standardizedFileURL.path
-            guard resolvedDest.hasPrefix(resolvedOutput) else {
+            // Security: verify destination is still within output directory.
+            // Compare path components so "/out" does not match "/out2".
+            let destComponents = destURL.standardizedFileURL.pathComponents
+            let outputComponents = outputDir.standardizedFileURL.pathComponents
+            guard destComponents.count > outputComponents.count,
+                  Array(destComponents.prefix(outputComponents.count)) == outputComponents else {
                 throw CompressionError.outputDirectoryNotWritable
             }
         } else {
@@ -38,37 +40,11 @@ nonisolated struct PathSanitizer {
         return destURL
     }
 
-    /// Append -1, -2, etc. if file already exists on disk (for single-file mode)
-    /// NOTE: For batch mode, use in-memory reservedPaths set instead
-    static func resolveCollision(at url: URL) -> URL {
-        var candidate = url
-        var counter = 1
-        let fm = FileManager.default
+    /// "photo.jpg" -> "photo-<number>.jpg". The whole original stem is kept, so names
+    /// that already end in a number ("2024-05-01", "IMG-0001") are not rewritten.
+    static func numberedVariant(of url: URL, number: Int) -> URL {
         let baseName = url.deletingPathExtension().lastPathComponent
-        let ext = url.pathExtension
-        let parentDir = url.deletingLastPathComponent()
-
-        while fm.fileExists(atPath: candidate.path) {
-            candidate = parentDir.appendingPathComponent("\(baseName)-\(counter).\(ext)")
-            counter += 1
-        }
-
-        return candidate
-    }
-
-    /// Append counter to URL (for in-memory collision resolution)
-    static func appendCounter(_ url: URL) -> URL {
-        let baseName = url.deletingPathExtension().lastPathComponent
-        let ext = url.pathExtension
-        let parentDir = url.deletingLastPathComponent()
-
-        // Extract existing counter if present (e.g., "photo-3" -> 3)
-        let parts = baseName.split(separator: "-")
-        if let last = parts.last, let num = Int(last), parts.count > 1 {
-            let nameWithoutCounter = parts.dropLast().joined(separator: "-")
-            return parentDir.appendingPathComponent("\(nameWithoutCounter)-\(num + 1).\(ext)")
-        }
-        return parentDir.appendingPathComponent("\(baseName)-1.\(ext)")
+        return url.deletingLastPathComponent().appendingPathComponent("\(baseName)-\(number).\(url.pathExtension)")
     }
 
     /// Validate output directory does not overlap with input.

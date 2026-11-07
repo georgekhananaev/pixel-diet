@@ -7,19 +7,19 @@ class ImageItem: Identifiable {
     let sourceURL: URL
     let originalFormat: ImageFormat?
     let detectedFormat: ImageFormat?
-    let originalSize: Int64
+    /// Updated when a compression finds the file was replaced since it was added
+    var originalSize: Int64
     let originalDimensions: CGSize
     let frameCount: Int
     let hasGPSData: Bool
+    let pixelLayout: PixelLayout
     let relativePath: String?
-    let bitDepth: Int
     let colorSpaceName: String?
 
     var destinationURL: URL?
     var status: ProcessingStatus = .queued
     var compressedSize: Int64?
     var compressedDimensions: CGSize?
-    var errorMessage: String?
 
     /// Which compression run this item was part of (nil = not yet processed)
     var batchRunId: Int?
@@ -48,6 +48,11 @@ class ImageItem: Identifiable {
 
     var isAnimated: Bool { frameCount > 1 }
 
+    var hasFailed: Bool {
+        if case .failed = status { return true }
+        return false
+    }
+
     /// The effective format (detected > extension-based)
     var effectiveFormat: ImageFormat? {
         detectedFormat ?? originalFormat
@@ -59,8 +64,8 @@ class ImageItem: Identifiable {
         originalDimensions: CGSize,
         frameCount: Int = 1,
         hasGPSData: Bool = false,
+        pixelLayout: PixelLayout = PixelLayout(),
         relativePath: String? = nil,
-        bitDepth: Int = 8,
         colorSpaceName: String? = nil,
         detectedFormat: ImageFormat? = nil
     ) {
@@ -69,8 +74,8 @@ class ImageItem: Identifiable {
         self.originalDimensions = originalDimensions
         self.frameCount = frameCount
         self.hasGPSData = hasGPSData
+        self.pixelLayout = pixelLayout
         self.relativePath = relativePath
-        self.bitDepth = bitDepth
         self.colorSpaceName = colorSpaceName
         self.detectedFormat = detectedFormat
         self.originalFormat = ImageFormat.from(extension: sourceURL.pathExtension)

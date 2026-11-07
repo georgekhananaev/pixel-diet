@@ -6,6 +6,6 @@ struct FileSizeLabel: View {
     var body: some View {
         Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
             .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.secondaryText)
     }
 }

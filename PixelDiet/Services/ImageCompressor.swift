@@ -1,132 +1,99 @@
 import Foundation
 import ImageIO
-import Accelerate
 import UniformTypeIdentifiers
 import os
 import CoreGraphics
-import libwebp
 
 /// CRITICAL: Must be `nonisolated` under Swift 6.2 with MainActor default isolation.
 /// Without this, compress() would hop to MainActor for every call from TaskGroup,
 /// serializing all compression on the main thread and freezing the UI. (Round 3 Fix)
 nonisolated struct ImageCompressor: ImageCompressing {
-    private let logger = Logger(subsystem: "com.georgekhananaev.PixelDiet", category: "compression")
-
     func compress(task: ImageTask, settings: SettingsSnapshot) throws -> CompressionResult {
-        // Resolve output format (.original -> use source format)
-        let outputFormat = settings.outputFormat == .original
-            ? (task.sourceFormat ?? .jpeg)
-            : settings.outputFormat
+        let outputFormat = task.outputFormat
 
         // Validate output format is available and can be written
         guard outputFormat.canBeOutput, let utType = outputFormat.utType else {
             throw CompressionError.unsupportedFormat(outputFormat.displayName)
         }
 
-        // 1. Create CGImageSource
-        guard let source = CGImageSourceCreateWithURL(task.sourceURL as CFURL, nil) else {
+        // 1. Create CGImageSource. ImageIO opens any path, so check the file is still there
+        // (it may have been moved or deleted since it was added) and actually holds an image.
+        // Its size is read now too (the image's, for a symbolic link): the file may have been replaced since it was added.
+        let sourcePath = task.sourceURL.resolvingSymlinksInPath().path
+        guard let sourceSize = (try? FileManager.default.attributesOfItem(atPath: sourcePath))?[.size] as? Int64 else {
+            throw CompressionError.sourceUnavailable
+        }
+        guard let source = CGImageSourceCreateWithURL(task.sourceURL as CFURL, nil),
+              CGImageSourceGetCount(source) > 0 else {
             throw CompressionError.cannotReadImage
         }
 
         // 2. Check for animated/multi-page
         let frameCount = CGImageSourceGetCount(source)
         if frameCount > 1 {
-            logger.warning("Multi-frame image (\(frameCount) frames): \(task.sourceURL.lastPathComponent)")
+            Logger.compression.warning("Multi-frame image (\(frameCount) frames): \(task.sourceURL.lastPathComponent)")
             // Process only first frame - caller should have warned user
         }
 
-        // 3. Read original metadata and ICC profile (without loading full CGImage)
-        let sourceProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
-        let iccProfileData = extractICCProfileData(from: source)
-
-        // 3b. Early dimension validation - fail fast before expensive resize
-        let srcWidth = sourceProperties?[kCGImagePropertyPixelWidth] as? Int ?? 0
-        let srcHeight = sourceProperties?[kCGImagePropertyPixelHeight] as? Int ?? 0
+        // 3. Read the metadata once, without decoding the image; fail fast on bad dimensions
+        let sourceProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+        let srcWidth = sourceProperties[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let srcHeight = sourceProperties[kCGImagePropertyPixelHeight] as? Int ?? 0
         guard srcWidth > 0 && srcHeight > 0 else {
             throw CompressionError.invalidDimensions
         }
 
-        // 4. Handle metadata
-        var outputMetadata: [CFString: Any]? = nil
-        if !settings.stripMetadata {
-            outputMetadata = sourceProperties
-        }
-        // When stripping metadata, EXIF orientation is applied via
-        // kCGImageSourceCreateThumbnailWithTransform in resizeMemoryEfficient
-
-        // 5. Resize using memory-efficient approach
-        let resizedImage: CGImage
-        if settings.maxDimension > 0 {
-            resizedImage = try resizeMemoryEfficient(
-                source: source,
-                maxDimension: settings.maxDimension,
-                applyOrientation: settings.stripMetadata
-            )
-        } else if settings.stripMetadata {
-            // No resize, but still need to apply orientation
-            resizedImage = try resizeMemoryEfficient(
-                source: source,
-                maxDimension: 0,
-                applyOrientation: true
-            )
-        } else {
-            // No resize, no metadata strip - load image as-is
-            guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-                throw CompressionError.cannotReadImage
-            }
-            resizedImage = image
-        }
-
-        // 6. Validate dimensions
-        guard resizedImage.width > 0 && resizedImage.height > 0 else {
+        // 4. Decode upright, downsampling during decode when resizing. The EXIF orientation is
+        // always applied to the pixels: BMP, AVIF, GIF and WebP cannot carry the tag reliably.
+        let image = try decodeUpright(
+            source,
+            longestEdge: settings.maxDimension > 0 ? settings.maxDimension : max(srcWidth, srcHeight)
+        )
+        guard image.width > 0 && image.height > 0 else {
             throw CompressionError.invalidDimensions
         }
 
-        // 7. Use pre-computed destination path (collision resolved on @MainActor)
+        // 5. Use pre-computed destination path (collision resolved on @MainActor)
         let destURL = try task.precomputedDestination ?? PathSanitizer.buildDestinationURL(
             source: task.sourceURL,
             outputDir: settings.outputDirectory,
             format: outputFormat,
             relativePath: settings.preserveDirectoryStructure ? task.relativePath : nil
         )
+        let destDirectory = destURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: destDirectory, withIntermediateDirectories: true)
 
-        // Create parent directories
-        try FileManager.default.createDirectory(
-            at: destURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-
-        // 8. Write to SYSTEM temp directory, then atomic move
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempURL = tempDir.appendingPathComponent(UUID().uuidString + "." + outputFormat.fileExtension)
+        // 6. Write to a hidden temp file next to the destination, then move it into place.
+        // Same volume as the destination (a move from the system temp dir cannot replace
+        // files on external drives) and inside the folder the user granted access to.
+        let tempURL = destDirectory.appendingPathComponent("\(TempFileSweeper.prefix)\(UUID().uuidString).\(outputFormat.fileExtension)")
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
-        // Strip alpha channel for formats that don't support it (JPEG, BMP, etc.)
-        // CGImageSourceCreateThumbnailAtIndex often returns AlphaLast even for opaque images,
-        // which causes ImageIO to log warnings and wastes memory on decode.
-        let finalImage: CGImage
-        if !outputFormat.supportsAlpha {
-            finalImage = stripAlpha(from: resizedImage) ?? resizedImage
-        } else {
-            finalImage = resizedImage
-        }
-
+        // Keeping metadata also keeps the color profile; stripping it converts colors to sRGB,
+        // so they look the same in every browser and app
+        let keepsMetadata = !settings.stripMetadata
         if outputFormat == .webp {
-            // Use libwebp for WebP encoding (ImageIO doesn't support WebP writing)
-            try writeWebP(finalImage, to: tempURL, quality: settings.quality)
+            let metadata = keepsMetadata ? CGImageSourceCopyMetadataAtIndex(source, 0, nil) : nil
+            try WebPEncoder.encode(image, quality: settings.quality, metadata: metadata).write(to: tempURL)
         } else {
             try writeImage(
-                finalImage,
+                rendered(image, flattened: !outputFormat.supportsAlpha, inSRGB: !keepsMetadata),
                 to: tempURL,
                 format: outputFormat,
                 utType: utType,
                 quality: settings.quality,
-                metadata: outputMetadata,
-                iccProfileData: settings.stripMetadata ? nil : iccProfileData
+                metadata: keepsMetadata ? Self.uprightMetadata(sourceProperties) : [:]
             )
         }
 
-        // 9. Atomic move - try moveItem first, fall back to replaceItemAt
+        // 7. Decide "skip if larger" before touching the destination, so an existing
+        // file the user chose to overwrite is never lost for a result we discard.
+        let outputSize = Int64(try tempURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+        if settings.skipIfLarger && outputSize > sourceSize {
+            throw CompressionError.outputLargerThanOriginal
+        }
+
+        // 8. Atomic move - try moveItem first, fall back to replaceItemAt
         let finalURL: URL
         do {
             try FileManager.default.moveItem(at: tempURL, to: destURL)
@@ -135,93 +102,84 @@ nonisolated struct ImageCompressor: ImageCompressing {
             finalURL = try FileManager.default.replaceItemAt(destURL, withItemAt: tempURL) ?? destURL
         }
 
-        // 10. Get output file size
-        let attrs = try FileManager.default.attributesOfItem(atPath: finalURL.path)
-        let outputSize = attrs[.size] as? Int64 ?? 0
-        let outputDimensions = CGSize(width: resizedImage.width, height: resizedImage.height)
-
         return CompressionResult(
+            sourceSize: sourceSize,
             outputURL: finalURL,
             outputSize: outputSize,
-            outputDimensions: outputDimensions
+            outputDimensions: CGSize(width: image.width, height: image.height)
         )
     }
 
-    // MARK: - Memory-Efficient Resize
+    // MARK: - Decode
 
-    /// Uses CGImageSourceCreateThumbnailAtIndex for memory-efficient downsampling.
-    /// This avoids loading the full-resolution bitmap - ImageIO downsamples during decode.
-    private func resizeMemoryEfficient(
-        source: CGImageSource,
-        maxDimension: Int,
-        applyOrientation: Bool
-    ) throws -> CGImage {
-        var options: [CFString: Any] = [
+    /// Decodes at most `longestEdge` pixels on the longer side (never upscaling) in display
+    /// orientation, with ImageIO downsampling during decode instead of loading the full-resolution bitmap.
+    private func decodeUpright(_ source: CGImageSource, longestEdge: Int) throws -> CGImage {
+        let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: applyOrientation,
-            kCGImageSourceShouldCacheImmediately: true
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: longestEdge
         ]
-
-        if maxDimension > 0 {
-            options[kCGImageSourceThumbnailMaxPixelSize] = maxDimension
-        } else {
-            // No resize - just decode with orientation applied
-            let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
-            let width = props?[kCGImagePropertyPixelWidth] as? Int ?? 0
-            let height = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
-            let maxSide = max(width, height)
-            if maxSide > 0 {
-                options[kCGImageSourceThumbnailMaxPixelSize] = maxSide
-            }
-        }
-
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
             throw CompressionError.resizeFailed
         }
-
         return image
     }
 
-    // MARK: - Color Space
+    // MARK: - Pixels
 
-    /// Extract ICC profile data from metadata WITHOUT loading the full CGImage.
-    private func extractICCProfileData(from source: CGImageSource) -> Data? {
-        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
-            return nil
-        }
-        return properties["ICC Profile" as CFString] as? Data
-    }
+    /// The pixels to write, redrawn only when needed: onto white for formats without
+    /// transparency (as people expect from a transparent logo saved as JPEG, instead of a
+    /// black background), and in sRGB when the color profile is not kept. Grayscale stays gray.
+    private func rendered(_ image: CGImage, flattened: Bool, inSRGB: Bool) -> CGImage {
+        let model = image.colorSpace?.model
+        let flattens = flattened && image.hasAlpha
+        let converts = inSRGB && model != .monochrome && image.colorSpace?.name != CGColorSpace.sRGB
+        guard flattens || converts else { return image }
 
-    // MARK: - Alpha Stripping
-
-    /// Re-render a CGImage without alpha for opaque output formats.
-    /// Prevents ImageIO "trying to save an opaque image with AlphaLast" warnings.
-    private func stripAlpha(from image: CGImage) -> CGImage? {
-        let alphaInfo = image.alphaInfo
-        if alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast {
-            return image // Already opaque
-        }
-
-        guard let colorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB) else {
-            return nil
+        // Gray and RGB spaces are kept unless converting; anything else is drawn in sRGB
+        let keepsSpace = !converts && (model == .monochrome || model == .rgb) && !image.usesExtendedRange
+        guard let space = keepsSpace ? image.colorSpace : CGColorSpace(name: CGColorSpace.sRGB) else { return image }
+        let alphaInfo: CGImageAlphaInfo = switch (flattens || !image.hasAlpha, space.model == .monochrome) {
+        case (true, true): .none
+        case (true, false): .noneSkipLast
+        case (false, _): .premultipliedLast
         }
         guard let context = CGContext(
-            data: nil,
-            width: image.width,
-            height: image.height,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: space, bitmapInfo: alphaInfo.rawValue
         ) else {
-            return nil
+            return image
         }
 
-        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-        return context.makeImage()
+        let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        if flattens {
+            context.setFillColor(CGColor.white)
+            context.fill(bounds)
+        }
+        context.draw(image, in: bounds)
+        return context.makeImage() ?? image
     }
 
     // MARK: - Write
+
+    /// Source metadata for the upright, possibly resized output: orientation reset, and the
+    /// original pixel size dropped (the HEIC writer would copy it as is).
+    private static func uprightMetadata(_ properties: [CFString: Any]) -> [CFString: Any] {
+        var metadata = properties
+        metadata[kCGImagePropertyOrientation] = 1
+        if var tiff = metadata[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
+            tiff[kCGImagePropertyTIFFOrientation] = 1
+            metadata[kCGImagePropertyTIFFDictionary] = tiff
+        }
+        if var exif = metadata[kCGImagePropertyExifDictionary] as? [CFString: Any] {
+            exif[kCGImagePropertyExifPixelXDimension] = nil
+            exif[kCGImagePropertyExifPixelYDimension] = nil
+            metadata[kCGImagePropertyExifDictionary] = exif
+        }
+        return metadata
+    }
 
     private func writeImage(
         _ image: CGImage,
@@ -229,8 +187,7 @@ nonisolated struct ImageCompressor: ImageCompressing {
         format: ImageFormat,
         utType: UTType,
         quality: Int,
-        metadata: [CFString: Any]?,
-        iccProfileData: Data?
+        metadata: [CFString: Any]
     ) throws {
         guard let destination = CGImageDestinationCreateWithURL(
             url as CFURL, utType.identifier as CFString, 1, nil
@@ -238,28 +195,9 @@ nonisolated struct ImageCompressor: ImageCompressing {
             throw CompressionError.cannotCreateDestination
         }
 
-        var properties: [CFString: Any] = [:]
-
-        // Set quality for formats that support it
+        var properties = metadata
         if format.supportsQuality {
             properties[kCGImageDestinationLossyCompressionQuality] = Double(quality) / 100.0
-        }
-
-        // Only optimize color for sharing if NOT preserving color profile
-        if iccProfileData == nil {
-            properties[kCGImageDestinationOptimizeColorForSharing] = true
-        }
-
-        // Preserve ICC color profile from metadata
-        if let iccData = iccProfileData {
-            properties["ICC Profile" as CFString] = iccData
-        }
-
-        // Preserve metadata if not stripping
-        if let metadata = metadata {
-            for (key, value) in metadata {
-                properties[key] = value
-            }
         }
 
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)
@@ -268,117 +206,12 @@ nonisolated struct ImageCompressor: ImageCompressing {
             throw CompressionError.writeFailed
         }
     }
-
-    // MARK: - WebP Encoding (via libwebp advanced API)
-
-    /// Encode a CGImage to WebP using libwebp's advanced API for better compression.
-    /// Fixes from audit:
-    /// - Uses WebPConfig with method=4 for good speed/quality balance
-    /// - Uses noneSkipLast for non-alpha (3-channel encode via WebPPictureImportRGBX)
-    /// - Uses premultipliedLast for alpha (libwebp handles unpremultiply internally)
-    /// - Single UnsafeMutablePointer buffer instead of Swift Array
-    /// - WebPMemoryWriter for zero-copy output
-    private func writeWebP(_ image: CGImage, to url: URL, quality: Int) throws {
-        let width = Int32(image.width)
-        let height = Int32(image.height)
-
-        let alphaInfo = image.alphaInfo
-        let hasAlpha = !(alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast)
-
-        // 1. Configure encoder - method 4 balances speed and compression
-        var config = WebPConfig()
-        guard WebPConfigInit(&config) != 0 else {
-            throw CompressionError.writeFailed
-        }
-        config.quality = Float(quality)
-        config.method = 2  // 0=fastest, 6=best compression. 2 is fast with good quality.
-        config.thread_level = 1  // Enable multi-threaded encoding
-        guard WebPValidateConfig(&config) != 0 else {
-            throw CompressionError.writeFailed
-        }
-
-        // 2. Initialize picture
-        var picture = WebPPicture()
-        guard WebPPictureInit(&picture) != 0 else {
-            throw CompressionError.writeFailed
-        }
-        picture.width = width
-        picture.height = height
-        picture.use_argb = 1  // We import ARGB data
-        defer { WebPPictureFree(&picture) }
-
-        // 3. Set up memory writer
-        var writer = WebPMemoryWriter()
-        WebPMemoryWriterInit(&writer)
-        defer { WebPMemoryWriterClear(&writer) }
-        picture.writer = WebPMemoryWrite
-        withUnsafeMutablePointer(to: &writer) { ptr in
-            picture.custom_ptr = UnsafeMutableRawPointer(ptr)
-        }
-
-        // 4. Render CGImage to raw pixel buffer
-        let bytesPerRow = Int(width) * 4
-        let totalBytes = bytesPerRow * Int(height)
-        guard totalBytes > 0, totalBytes / 4 == Int(width) * Int(height) else {
-            throw CompressionError.invalidDimensions
-        }
-        let rawData = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBytes)
-        defer { rawData.deallocate() }
-
-        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
-            throw CompressionError.writeFailed
-        }
-
-        // For non-alpha: use noneSkipLast (skip the 4th byte - faster, no alpha processing)
-        // For alpha: use premultipliedLast (CGContext requirement; libwebp handles it)
-        let bitmapInfo: UInt32 = hasAlpha
-            ? (CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
-            : (CGImageAlphaInfo.noneSkipLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
-
-        guard let context = CGContext(
-            data: rawData,
-            width: Int(width),
-            height: Int(height),
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo
-        ) else {
-            throw CompressionError.writeFailed
-        }
-
-        context.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
-
-        // 5. Import pixels into WebPPicture
-        let importResult: Int32
-        if hasAlpha {
-            importResult = WebPPictureImportRGBA(&picture, rawData, Int32(bytesPerRow))
-        } else {
-            // RGBX: 4-byte stride but ignores the X channel - avoids alpha overhead
-            importResult = WebPPictureImportRGBX(&picture, rawData, Int32(bytesPerRow))
-        }
-
-        guard importResult != 0 else {
-            throw CompressionError.writeFailed
-        }
-
-        // 6. Encode
-        guard WebPEncode(&config, &picture) != 0 else {
-            throw CompressionError.writeFailed
-        }
-
-        // 7. Write to disk (WebPMemoryWriterClear handled by defer above)
-        guard let encodedData = writer.mem, writer.size > 0 else {
-            throw CompressionError.writeFailed
-        }
-
-        let data = Data(bytes: encodedData, count: writer.size)
-        try data.write(to: url)
-    }
 }
 
 /// Must be `nonisolated` - returned from background compression tasks (Round 3 Fix)
 nonisolated struct CompressionResult: Sendable {
+    /// Size of the source file when it was compressed
+    let sourceSize: Int64
     let outputURL: URL
     let outputSize: Int64
     let outputDimensions: CGSize

@@ -12,6 +12,7 @@ struct DropZoneView: View {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 60))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)  // Decorative: the text below says what to do
 
             Text(String(localized: "Drop images or folders here"))
                 .font(.title3.weight(.medium))
@@ -19,21 +20,26 @@ struct DropZoneView: View {
 
             Text(String(localized: "or"))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondaryText)
 
-            Button {
-                presentOpenPanel()
-            } label: {
-                Text(String(localized: "Browse Files"))
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
+            if viewModel.isImporting {
+                ProgressView(String(localized: "Adding images…"))
+                    .controlSize(.large)
+            } else {
+                Button {
+                    viewModel.presentAddImagesPanel()
+                } label: {
+                    Text(String(localized: "Browse Files"))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
 
-            Text(String(localized: "JPEG, PNG, WebP, HEIC, AVIF, TIFF, BMP, GIF"))
+            Text(String(localized: "JPEG, PNG, WebP, HEIC, HEIF, AVIF, TIFF, BMP, GIF, PPM"))
                 .font(.caption2)
-                .foregroundStyle(.quaternary)
+                .foregroundStyle(.secondaryText)
 
             Spacer()
         }
@@ -52,47 +58,8 @@ struct DropZoneView: View {
         .background(isTargeted ? Color.accentColor.opacity(0.05) : Color.clear)
         .animation(.easeInOut(duration: 0.2), value: isTargeted)
         .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
-            handleDrop(providers: providers)
+            viewModel.addDroppedItems(providers)
             return true
-        }
-    }
-
-    private func presentOpenPanel() {
-        let panel = NSOpenPanel()
-        panel.title = String(localized: "Add Images")
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.image]
-
-        guard panel.runModal() == .OK else { return }
-
-        Task {
-            await viewModel.addFiles(urls: panel.urls)
-        }
-    }
-
-    private func handleDrop(providers: [NSItemProvider]) {
-        let queue = DispatchQueue(label: "com.georgekhananaev.PixelDiet.drop")
-        var urls: [URL] = []
-        let group = DispatchGroup()
-
-        for provider in providers {
-            guard provider.canLoadObject(ofClass: URL.self) else { continue }
-            group.enter()
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                if let url {
-                    queue.sync { urls.append(url) }
-                }
-                group.leave()
-            }
-        }
-
-        group.notify(queue: .main) {
-            guard !urls.isEmpty else { return }
-            Task {
-                await viewModel.addFiles(urls: urls)
-            }
         }
     }
 }

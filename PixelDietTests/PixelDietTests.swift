@@ -1,5 +1,6 @@
 import Testing
-import Foundation
+import AppKit
+import UniformTypeIdentifiers
 @testable import PixelDiet
 
 // MARK: - ImageFormat Tests
@@ -69,7 +70,7 @@ struct ProcessingStatusTests {
 @MainActor
 struct CompressionSettingsTests {
     @Test func defaultValues() {
-        let settings = CompressionSettings()
+        let settings = TestSettings.make()
         #expect(settings.quality == 80)
         #expect(settings.maxDimension == 1920)
         #expect(settings.outputFormat == .jpeg)
@@ -80,7 +81,7 @@ struct CompressionSettingsTests {
     }
 
     @Test func qualityClamping() {
-        let settings = CompressionSettings()
+        let settings = TestSettings.make()
         settings.setQuality(5)
         #expect(settings.quality == 10)
         settings.setQuality(150)
@@ -90,22 +91,22 @@ struct CompressionSettingsTests {
     }
 
     @Test func maxDimensionClamping() {
-        let settings = CompressionSettings()
+        let settings = TestSettings.make()
         settings.setMaxDimension(0)
         #expect(settings.maxDimension == 0) // 0 = no resize
         settings.setMaxDimension(10)
         #expect(settings.maxDimension == 64) // min
         settings.setMaxDimension(99999)
-        #expect(settings.maxDimension == 16384) // max
+        #expect(settings.maxDimension == 16383) // max: the largest WebP size
         settings.setMaxDimension(1920)
         #expect(settings.maxDimension == 1920)
     }
 
     @Test func snapshot() {
-        let settings = CompressionSettings()
+        let settings = TestSettings.make()
         #expect(settings.snapshot() == nil) // nil when no output directory
 
-        settings.outputDirectory = URL(fileURLWithPath: "/tmp/test")
+        settings.chooseOutputDirectory(URL(fileURLWithPath: "/tmp/test"))
         let snap = settings.snapshot()
         #expect(snap != nil)
         #expect(snap?.quality == 80)
@@ -144,13 +145,42 @@ struct PathSanitizerTests {
         #expect(!url.lastPathComponent.contains("/"))
     }
 
-    @Test func collisionAppendCounter() {
+    @Test func numberedVariantKeepsTheOriginalStem() {
         let url = URL(fileURLWithPath: "/output/photo.jpg")
-        let result = PathSanitizer.appendCounter(url)
-        #expect(result.lastPathComponent == "photo-1.jpg")
+        #expect(PathSanitizer.numberedVariant(of: url, number: 1).lastPathComponent == "photo-1.jpg")
+        #expect(PathSanitizer.numberedVariant(of: url, number: 2).lastPathComponent == "photo-2.jpg")
+        // A user's own trailing number is part of the name, not a counter
+        let dated = URL(fileURLWithPath: "/output/2024-05-01.jpg")
+        #expect(PathSanitizer.numberedVariant(of: dated, number: 1).lastPathComponent == "2024-05-01-1.jpg")
+    }
 
-        let result2 = PathSanitizer.appendCounter(result)
-        #expect(result2.lastPathComponent == "photo-2.jpg")
+    @Test func destinationKeepsMultiDotAndUnicodeNames() throws {
+        let outputDir = URL(fileURLWithPath: "/output")
+        let multiDot = try PathSanitizer.buildDestinationURL(
+            source: URL(fileURLWithPath: "/input/my.photo.v2.jpg"), outputDir: outputDir, format: .webp, relativePath: nil
+        )
+        #expect(multiDot.lastPathComponent == "my.photo.v2.webp")
+
+        let unicode = try PathSanitizer.buildDestinationURL(
+            source: URL(fileURLWithPath: "/input/фото 1.png"), outputDir: outputDir, format: .jpeg, relativePath: nil
+        )
+        #expect(unicode.lastPathComponent == "фото 1.jpg")
+
+        #expect(PathSanitizer.numberedVariant(of: URL(fileURLWithPath: "/output/img-3.jpg"), number: 1).lastPathComponent == "img-3-1.jpg")
+    }
+
+    @Test func relativePathCannotEscapeOutputDirectory() {
+        let source = URL(fileURLWithPath: "/input/x.jpg")
+        #expect(throws: CompressionError.self) {
+            try PathSanitizer.buildDestinationURL(
+                source: source, outputDir: URL(fileURLWithPath: "/out"), format: .jpeg, relativePath: "../out2/x.jpg"
+            )
+        }
+        #expect(throws: CompressionError.self) {
+            try PathSanitizer.buildDestinationURL(
+                source: source, outputDir: URL(fileURLWithPath: "/out"), format: .jpeg, relativePath: "../../etc/x.jpg"
+            )
+        }
     }
 
     @Test func overlapValidation() throws {
@@ -188,6 +218,17 @@ struct BatchJobTests {
         #expect(job.items.count == 1) // Deduplicated
     }
 
+    @Test func addItemsDeduplicatesWithinOneImport() {
+        let job = BatchJob()
+        let url = URL(fileURLWithPath: "/test/img.jpg")
+        let items = (0..<2).map { _ in
+            ImageItem(sourceURL: url, originalSize: 1000, originalDimensions: CGSize(width: 100, height: 100))
+        }
+        #expect(job.addItems(items).count == 1)
+        #expect(job.items.count == 1)
+        #expect(job.totalOriginalSize == 1000)
+    }
+
     @Test func incrementalCounters() {
         let job = BatchJob()
         let item = ImageItem(
@@ -199,12 +240,14 @@ struct BatchJobTests {
         job.startRun(format: "JPEG", quality: 80, itemCount: 2)
 
         job.recordCompletion(status: .completed, originalSize: 1000, compressedSize: 500)
-        #expect(job.completedCount == 1)
-        #expect(job.processedCount == 1)
+        #expect(job.activeRun?.completedCount == 1)
+        #expect(job.activeRun?.processedCount == 1)
+        #expect(job.progress == 0.5)
 
         job.recordCompletion(status: .failed(error: "test"), originalSize: 1000, compressedSize: nil)
-        #expect(job.failedCount == 1)
-        #expect(job.processedCount == 2)
+        #expect(job.activeRun?.failedCount == 1)
+        #expect(job.activeRun?.processedCount == 2)
+        #expect(job.activeRun?.totalSavings == 500)
     }
 
     @Test func clear() {
@@ -219,7 +262,8 @@ struct BatchJobTests {
         job.recordCompletion(status: .completed, originalSize: 1000, compressedSize: 500)
         job.clear()
         #expect(job.items.isEmpty)
-        #expect(job.completedCount == 0)
+        #expect(job.runHistory.isEmpty)
+        #expect(job.totalOriginalSize == 0)
     }
 }
 
@@ -243,27 +287,73 @@ struct CompressionErrorTests {
 @MainActor
 struct SettingsStoreTests {
     @Test func saveAndLoad() throws {
-        let suiteName = "PixelDietTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        let store = SettingsStore(defaults: defaults)
+        try TestSettings.withScratchDefaults { defaults in
+            let store = SettingsStore(defaults: defaults)
 
-        let data = SettingsData(
-            outputFormat: "png",
-            quality: 60,
-            maxDimension: 1280,
-            preserveDirectoryStructure: true,
-            stripMetadata: false,
-            skipIfLarger: false
-        )
-        try store.save(data)
+            let data = SettingsData(
+                outputFormat: "png",
+                quality: 60,
+                maxDimension: 1280,
+                preserveDirectoryStructure: true,
+                stripMetadata: false,
+                skipIfLarger: false
+            )
+            try store.save(data)
 
-        let loaded = store.load()
-        #expect(loaded?.outputFormat == "png")
-        #expect(loaded?.quality == 60)
-        #expect(loaded?.maxDimension == 1280)
-        #expect(loaded?.preserveDirectoryStructure == true)
-        #expect(loaded?.stripMetadata == false)
+            let loaded = store.load()
+            #expect(loaded?.outputFormat == "png")
+            #expect(loaded?.quality == 60)
+            #expect(loaded?.maxDimension == 1280)
+            #expect(loaded?.preserveDirectoryStructure == true)
+            #expect(loaded?.stripMetadata == false)
+        }
+    }
+}
 
-        defaults.removePersistentDomain(forName: suiteName)
+// MARK: - Savings Display Tests
+
+@MainActor
+struct SavingsDisplayTests {
+    @Test func nearlyCompleteSavingsNeverReadAsHundredPercent() {
+        #expect(SavingsIndicator.percentText(for: 99.6) == "99%")
+        #expect(SavingsIndicator.percentText(for: 100) == "100%")
+        #expect(SavingsIndicator.percentText(for: 42.5) == "43%")
+        #expect(SavingsIndicator.percentText(for: -12.4) == "12%")
+    }
+
+    @Test func accessibilityTextDescribesDirection() {
+        #expect(SavingsIndicator.accessibilityText(for: 99.6) == "Saved 99 percent")
+        #expect(SavingsIndicator.accessibilityText(for: -12.4) == "Increased by 12 percent")
+    }
+}
+
+// MARK: - Counted Text Tests
+
+struct CountTextTests {
+    @Test func countedPhrasesUseTheSingularForOne() {
+        #expect(CountText.images(1) == "1 image")
+        #expect(CountText.images(2) == "2 images")
+        #expect(CountText.compressImages(1) == "Compress 1 Image")
+        #expect(CountText.compressImages(12) == "Compress 12 Images")
+        #expect(CountText.items(1) == "1 item")
+        #expect(CountText.items(3) == "3 items")
+        #expect(CountText.imagesCompressed(1) == "Batch complete - 1 image compressed")
+        #expect(CountText.imagesCompressed(5) == "Batch complete - 5 images compressed")
+    }
+}
+
+// MARK: - Open Panel Tests
+
+@MainActor
+struct OpenPanelsTests {
+    /// Apps built with the macOS 27 SDK derive `canChooseFiles`/`canChooseDirectories`
+    /// from `allowedContentTypes`, so an image-only list would make folders unselectable
+    @Test func addImagesPanelAcceptsImagesAndFolders() {
+        let panel = OpenPanels.makeAddImagesPanel()
+        #expect(panel.canChooseFiles)
+        #expect(panel.canChooseDirectories)
+        #expect(panel.allowsMultipleSelection)
+        #expect(panel.allowedContentTypes.contains(.image))
+        #expect(panel.allowedContentTypes.contains(.folder), "Folders stay selectable however AppKit derives the flags")
     }
 }

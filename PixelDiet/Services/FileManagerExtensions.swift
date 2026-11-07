@@ -1,7 +1,4 @@
 import Foundation
-import os
-
-private let logger = Logger(subsystem: "com.georgekhananaev.PixelDiet", category: "fileAccess")
 
 extension FileManager {
     /// Recursively find all supported image files in a directory.
@@ -53,39 +50,13 @@ extension FileManager {
         return results
     }
 
-    /// Calculate total size of files at URLs
-    func totalSize(of urls: [URL]) -> Int64 {
-        urls.reduce(0) { total, url in
-            do {
-                let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-                return total + Int64(size)
-            } catch {
-                logger.warning("Failed to read file size for \(url.lastPathComponent): \(error.localizedDescription)")
-                return total
-            }
-        }
-    }
-
-    /// Check available disk space at a path
-    func availableDiskSpace(at url: URL) -> Int64? {
-        do {
-            let values = try url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            return values.volumeAvailableCapacityForImportantUsage
-        } catch {
-            logger.warning("Failed to check disk space at \(url.path): \(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    /// Test if a directory is writable by creating and removing a temp file
-    func isDirectoryWritable(_ url: URL) -> Bool {
-        let testFile = url.appendingPathComponent(".pixeldiet-write-test-\(UUID().uuidString)")
-        do {
-            try Data().write(to: testFile)
-            try removeItem(at: testFile)
-            return true
-        } catch {
-            return false
-        }
+    /// Whether a file can be created in `directory`, found by creating and removing a hidden
+    /// one: permission checks can be wrong on network volumes. A crash in between leaves a
+    /// temp file that `TempFileSweeper` removes later.
+    nonisolated func canCreateFiles(in directory: URL) -> Bool {
+        let probe = directory.appendingPathComponent("\(TempFileSweeper.prefix)\(UUID().uuidString)")
+        guard createFile(atPath: probe.path, contents: nil) else { return false }
+        try? removeItem(at: probe)
+        return true
     }
 }

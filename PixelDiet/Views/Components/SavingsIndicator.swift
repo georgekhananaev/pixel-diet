@@ -3,11 +3,31 @@ import SwiftUI
 struct SavingsIndicator: View {
     let percentage: Double
 
+    /// Whole-number magnitude; anything short of 100% shows at most 99%,
+    /// so a file that still has bytes never reads as "100% saved".
+    private static func displayValue(for percentage: Double) -> Int {
+        let magnitude = abs(percentage)
+        return magnitude < 100 ? min(99, Int(magnitude.rounded())) : Int(magnitude)
+    }
+
+    /// Magnitude for display, e.g. "42%" (direction is shown by the arrow)
+    static func percentText(for percentage: Double) -> String {
+        "\(displayValue(for: percentage))%"
+    }
+
+    /// Spoken description, e.g. "Saved 42 percent" or "Increased by 12 percent"
+    static func accessibilityText(for percentage: Double) -> String {
+        let value = displayValue(for: percentage)
+        return percentage >= 0
+            ? String(localized: "Saved \(value) percent")
+            : String(localized: "Increased by \(value) percent")
+    }
+
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: percentage >= 0 ? "arrow.down" : "arrow.up")
                 .font(.system(size: 9, weight: .bold))
-            Text(String(format: "%.0f%%", abs(percentage)))
+            Text(Self.percentText(for: percentage))
                 .font(.caption.monospacedDigit().bold())
         }
         .foregroundStyle(foregroundColor)
@@ -15,22 +35,23 @@ struct SavingsIndicator: View {
         .padding(.vertical, 2)
         .background(backgroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 4))
-        .accessibilityLabel("Saved \(Int(percentage)) percent")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.accessibilityText(for: percentage))
     }
 
     private var foregroundColor: Color {
         if percentage < 0 {
-            return .red
+            return .failure
         } else if percentage < 20 {
-            return .secondary
+            return .secondaryText
         } else if percentage < 50 {
-            return .green
+            return .success
         } else {
-            return .mint
+            return .highSavings
         }
     }
 
     private var backgroundColor: Color {
-        foregroundColor.opacity(0.12)
+        foregroundColor.opacity(Palette.badgeTintOpacity)
     }
 }

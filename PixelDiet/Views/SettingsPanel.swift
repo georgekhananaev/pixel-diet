@@ -1,65 +1,28 @@
 import SwiftUI
 
 struct SettingsPanel: View {
-    @Bindable var settings: CompressionSettings
-    var batchJob: BatchJob
+    var viewModel: MainViewModel
+
+    private var batchJob: BatchJob { viewModel.batchJob }
 
     var body: some View {
+        @Bindable var settings = viewModel.settings
         Form {
             Section {
-                Picker(String(localized: "Output Format"), selection: $settings.outputFormat) {
-                    ForEach(ImageFormat.availableOutputFormats) { format in
-                        if format == .avif && !ImageFormat.isAVIFEncodingAvailable {
-                            Text("\(format.displayName) (Requires macOS 14.1+)")
-                                .tag(format)
-                                .disabled(true)
-                        } else {
-                            Text(format.displayName)
-                                .tag(format)
-                        }
-                    }
-                }
-                .help("Choose the output image format")
+                OutputFormatPicker(settings: settings)
+                    .help(String(localized: "Choose the output image format"))
 
-                if !settings.outputFormat.supportsAlpha && settings.outputFormat != .original {
-                    Text(String(localized: "This format does not support transparency"))
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                if viewModel.flattensTransparentImages {
+                    WarningNote(text: String(localized: "Transparent areas become white in this format"))
                 }
             } header: {
                 Text(String(localized: "Format"))
             }
 
-            if settings.outputFormat.supportsQuality || settings.outputFormat == .original {
+            if settings.outputFormat.supportsQuality {
                 Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(String(localized: "Quality"))
-                            Spacer()
-                            Text("\(settings.quality)")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Slider(
-                            value: Binding(
-                                get: { Double(settings.quality) },
-                                set: { settings.setQuality(Int($0)) }
-                            ),
-                            in: 10...100
-                        )
-                        .help("Higher quality = larger file size. 80 is recommended for most uses.")
-
-                        HStack {
-                            Text(String(localized: "Smaller file"))
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                            Spacer()
-                            Text(String(localized: "Higher quality"))
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
+                    QualitySlider(settings: settings)
+                        .help(String(localized: "Higher quality = larger file size. 80 is recommended for most uses."))
                 } header: {
                     Text(String(localized: "Quality"))
                 }
@@ -67,28 +30,8 @@ struct SettingsPanel: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(String(localized: "Max longest edge"))
-                        Spacer()
-                        TextField(
-                            "",
-                            value: Binding(
-                                get: { settings.maxDimension },
-                                set: { settings.setMaxDimension($0) }
-                            ),
-                            format: .number
-                        )
-                        .frame(width: 70)
-                        .textFieldStyle(.roundedBorder)
-                        .multilineTextAlignment(.trailing)
-                        Text(String(localized: "px"))
-                            .foregroundStyle(.secondary)
-                    }
-                    .help("Images larger than this will be scaled down. 0 keeps original size.")
-
-                    Text(String(localized: "0 = keep original dimensions"))
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    MaxDimensionField(settings: settings)
+                        .help(String(localized: "Images larger than this will be scaled down. 0 keeps original size."))
 
                     // Preset buttons
                     HStack(spacing: 6) {
@@ -99,8 +42,10 @@ struct SettingsPanel: View {
                             .buttonStyle(.bordered)
                             .controlSize(.mini)
                             .foregroundStyle(
-                                settings.maxDimension == size ? .primary : .secondary
+                                settings.maxDimension == size ? Color.primary : .secondaryText
                             )
+                            .accessibilityLabel(String(localized: "\(size) pixels"))
+                            .accessibilityAddTraits(settings.maxDimension == size ? .isSelected : [])
                         }
                     }
                 }
@@ -112,25 +57,15 @@ struct SettingsPanel: View {
                 Toggle(isOn: $settings.stripMetadata) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(String(localized: "Strip EXIF Metadata"))
-                        Text(String(localized: "Removes camera info, GPS location, and other embedded data. Image orientation is preserved."))
+                        Text(String(localized: "Removes camera info, GPS location, and other embedded data, and converts colors to sRGB. Photos stay upright."))
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondaryText)
                     }
                 }
-                .help("Removes camera info, GPS location, timestamps. Orientation is preserved.")
+                .help(String(localized: "Removes camera info, GPS location and timestamps. Turn off to keep them and the original color profile (CMYK becomes sRGB)."))
 
-                if !settings.stripMetadata {
-                    let hasGPSItems = batchJob.items.contains { $0.hasGPSData }
-                    if hasGPSItems {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.yellow)
-                                .font(.caption)
-                            Text(String(localized: "Some images contain GPS location data"))
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        }
-                    }
+                if !settings.stripMetadata && batchJob.items.contains(where: \.hasGPSData) {
+                    WarningNote(text: String(localized: "Some images contain GPS location data"))
                 }
 
                 Toggle(isOn: $settings.skipIfLarger) {
@@ -138,20 +73,20 @@ struct SettingsPanel: View {
                         Text(String(localized: "Skip If Larger"))
                         Text(String(localized: "Skip files where compression increases file size"))
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondaryText)
                     }
                 }
-                .help("If compression makes the file bigger, keep the original instead.")
+                .help(String(localized: "If compression makes the file bigger, keep the original instead."))
 
                 Toggle(isOn: $settings.preserveDirectoryStructure) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(String(localized: "Preserve Directory Structure"))
                         Text(String(localized: "Maintain folder hierarchy in output"))
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondaryText)
                     }
                 }
-                .help("Recreate the input folder hierarchy in the output folder.")
+                .help(String(localized: "Recreate the input folder hierarchy in the output folder."))
             } header: {
                 Text(String(localized: "Options"))
             }
@@ -171,16 +106,17 @@ struct SettingsPanel: View {
                     } else {
                         Text(String(localized: "No output folder selected"))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.secondaryText)
                     }
 
                     Button {
-                        chooseOutputFolder()
+                        viewModel.presentOutputFolderPanel()
                     } label: {
                         Label(String(localized: "Choose Output Folder..."), systemImage: "folder.badge.plus")
                     }
-                    .keyboardShortcut("o", modifiers: [.command, .shift])
-                    .help("Where compressed images will be saved.")
+                    // Changing it mid-run would revoke access to the folder being written to
+                    .disabled(batchJob.isProcessing)
+                    .help(String(localized: "Where compressed images will be saved."))
                 }
             } header: {
                 Text(String(localized: "Output"))
@@ -190,18 +126,16 @@ struct SettingsPanel: View {
         .scrollIndicators(.automatic)
         .scrollContentBackground(.hidden)
     }
+}
 
-    private func chooseOutputFolder() {
-        let panel = NSOpenPanel()
-        panel.title = String(localized: "Choose Output Folder")
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
+/// A caption with a warning sign, for settings that may surprise people.
+private struct WarningNote: View {
+    let text: String
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        settings.outputDirectory = url
-        try? BookmarkManager.saveBookmark(for: url)
+    var body: some View {
+        Label(text, systemImage: "exclamationmark.triangle.fill")
+            .font(.caption)
+            .foregroundStyle(.secondaryText)
+            .symbolRenderingMode(.multicolor)
     }
 }

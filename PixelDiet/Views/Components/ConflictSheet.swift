@@ -3,6 +3,8 @@ import SwiftUI
 struct ConflictSheet: View {
     let fileName: String
     let onChoice: (MainViewModel.ConflictChoice) -> Void
+    /// Stops the whole batch: nothing more is written
+    let onStop: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -10,14 +12,15 @@ struct ConflictSheet: View {
             VStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 36))
-                    .foregroundStyle(.yellow)
+                    .symbolRenderingMode(.multicolor)
+                    .accessibilityHidden(true)  // The title says it
 
                 Text(String(localized: "File Already Exists"))
                     .font(.headline)
 
                 Text(String(localized: "\"\(fileName)\" already exists in the output folder."))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .multilineTextAlignment(.center)
             }
             .padding(.top, 20)
@@ -30,20 +33,20 @@ struct ConflictSheet: View {
             VStack(spacing: 8) {
                 // Overwrite group
                 HStack(spacing: 8) {
-                    actionButton("Overwrite", icon: "arrow.triangle.2.circlepath", color: .orange) {
+                    actionButton("Overwrite", icon: "arrow.triangle.2.circlepath", color: .caution) {
                         onChoice(.overwrite)
                     }
-                    actionButton("Overwrite All", icon: "arrow.triangle.2.circlepath.circle.fill", color: .orange) {
+                    actionButton("Overwrite All", icon: "arrow.triangle.2.circlepath.circle.fill", color: .caution) {
                         onChoice(.overwriteAll)
                     }
                 }
 
                 // Rename group
                 HStack(spacing: 8) {
-                    actionButton("Rename", icon: "doc.on.doc", color: .blue) {
+                    actionButton("Rename", icon: "doc.on.doc", color: .accentColor) {
                         onChoice(.rename)
                     }
-                    actionButton("Rename All", icon: "doc.on.doc.fill", color: .blue) {
+                    actionButton("Rename All", icon: "doc.on.doc.fill", color: .accentColor) {
                         onChoice(.renameAll)
                     }
                 }
@@ -65,31 +68,35 @@ struct ConflictSheet: View {
 
             Text(String(localized: "\"All\" options apply to remaining conflicts in this batch."))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
-                .padding(.bottom, 16)
+                .foregroundStyle(.secondaryText)
+
+            Button(String(localized: "Stop Compressing"), action: onStop)
+                .keyboardShortcut(".", modifiers: .command)
+                .padding(.vertical, 16)
         }
-        .frame(width: 380, height: 340)
+        .frame(width: 380, height: 380)
         .onExitCommand {
             onChoice(.skip)
         }
     }
 
     private func actionButton(
-        _ title: String,
+        _ title: LocalizedStringKey,
         icon: String,
         color: Color,
         action: @escaping () -> Void
     ) -> some View {
+        // Only the icon is colored: tinted button text would be too light to read in Light Mode
         Button(action: action) {
             HStack {
                 Image(systemName: icon)
+                    .foregroundStyle(color)
                     .frame(width: 16)
-                Text(String(localized: "\(title)"))
+                Text(title)
             }
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
-        .tint(color)
         .controlSize(.large)
     }
 }

@@ -8,67 +8,54 @@ nonisolated struct ImageAnalyzer: ImageAnalyzing {
     nonisolated struct ImageInfo: Sendable {
         let fileSize: Int64
         let dimensions: CGSize
-        let format: ImageFormat?
         let detectedFormat: ImageFormat?
-        let hasAlpha: Bool
         let colorSpaceName: String?
-        let dpi: Double?
-        let bitDepth: Int
         let frameCount: Int
         let hasGPSData: Bool
+        let pixelLayout: PixelLayout
     }
 
-    /// Analyze an image file without fully loading it into memory
+    /// Analyze an image file without fully loading it into memory.
+    /// Throws `cannotReadImage` for empty files and files ImageIO cannot decode.
     func analyze(url: URL) throws -> ImageInfo {
-        let fileSize = try FileManager.default
-            .attributesOfItem(atPath: url.path)[.size] as? Int64 ?? 0
+        // The size of the image a symbolic link points to, not of the link
+        let fileSize = Int64(try url.resolvingSymlinksInPath().resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
 
         // Skip zero-byte files
         guard fileSize > 0 else {
             throw CompressionError.cannotReadImage
         }
 
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+        // ImageIO opens any file; only accept sources with at least one decodable image
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              CGImageSourceGetCount(source) > 0,
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int, width > 0,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int, height > 0 else {
             throw CompressionError.cannotReadImage
         }
 
-        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
-
-        let width = properties?[kCGImagePropertyPixelWidth] as? Int ?? 0
-        let height = properties?[kCGImagePropertyPixelHeight] as? Int ?? 0
-        let hasAlpha = properties?[kCGImagePropertyHasAlpha] as? Bool ?? false
-        let colorSpace = properties?[kCGImagePropertyColorModel] as? String
-        let dpiWidth = properties?[kCGImagePropertyDPIWidth] as? Double
-        let bitDepth = properties?[kCGImagePropertyDepth] as? Int ?? 8
-
-        // Frame count for animated GIF / multi-page TIFF
-        let frameCount = CGImageSourceGetCount(source)
-
-        // GPS data detection
-        let gpsDict = properties?[kCGImagePropertyGPSDictionary as CFString]
-        let hasGPS = gpsDict != nil
-
         // Content-based format detection
-        let detectedFormat: ImageFormat?
-        if let sourceType = CGImageSourceGetType(source) as? String {
-            detectedFormat = ImageFormat.from(typeIdentifier: sourceType)
-        } else {
-            detectedFormat = nil
-        }
+        let detectedFormat = (CGImageSourceGetType(source) as? String).flatMap(ImageFormat.from(typeIdentifier:))
 
-        let extensionFormat = ImageFormat.from(extension: url.pathExtension)
+        // Size as the photo is displayed: EXIF orientations 5-8 rotate it by 90 degrees
+        let orientation = properties[kCGImagePropertyOrientation] as? Int ?? 1
+        let isRotated = (5...8).contains(orientation)
 
         return ImageInfo(
             fileSize: fileSize,
-            dimensions: CGSize(width: width, height: height),
-            format: extensionFormat,
+            dimensions: isRotated ? CGSize(width: height, height: width) : CGSize(width: width, height: height),
             detectedFormat: detectedFormat,
-            hasAlpha: hasAlpha,
-            colorSpaceName: colorSpace,
-            dpi: dpiWidth,
-            bitDepth: bitDepth,
-            frameCount: frameCount,
-            hasGPSData: hasGPS
+            // The embedded profile ("Display P3"), else the color model ("RGB", "Gray")
+            colorSpaceName: properties[kCGImagePropertyProfileName] as? String ?? properties[kCGImagePropertyColorModel] as? String,
+            // Frame count for animated GIF / multi-page TIFF
+            frameCount: CGImageSourceGetCount(source),
+            hasGPSData: properties[kCGImagePropertyGPSDictionary] != nil,
+            pixelLayout: PixelLayout(
+                hasAlpha: properties[kCGImagePropertyHasAlpha] as? Bool ?? false,
+                isHighBitDepth: (properties[kCGImagePropertyDepth] as? Int ?? 8) > 8,
+                isInterlaced: (properties[kCGImagePropertyPNGDictionary] as? [CFString: Any])?[kCGImagePropertyPNGInterlaceType] as? Int == 1
+            )
         )
     }
 

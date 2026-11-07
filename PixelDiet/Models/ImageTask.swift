@@ -3,27 +3,25 @@ import Foundation
 nonisolated struct ImageTask: Sendable {
     let id: UUID
     let sourceURL: URL
-    let originalSize: Int64
     let relativePath: String?
-    let sourceFormat: ImageFormat?
-    let bitDepth: Int
-    let colorSpaceName: String?
-    let frameCount: Int
+    /// Final output format, already resolved from the requested format and the source format
+    let outputFormat: ImageFormat
+    /// Source size and pixel storage, to estimate memory use
+    let dimensions: CGSize
+    let pixelLayout: PixelLayout
     var precomputedDestination: URL?
 }
 
 extension ImageItem {
     /// Create a Sendable snapshot for actor boundary crossing
-    func toTask() -> ImageTask {
+    func toTask(requestedFormat: ImageFormat) -> ImageTask {
         ImageTask(
             id: id,
             sourceURL: sourceURL,
-            originalSize: originalSize,
             relativePath: relativePath,
-            sourceFormat: effectiveFormat,
-            bitDepth: bitDepth,
-            colorSpaceName: colorSpaceName,
-            frameCount: frameCount
+            outputFormat: ImageFormat.resolvedOutput(requested: requestedFormat, source: effectiveFormat),
+            dimensions: originalDimensions,
+            pixelLayout: pixelLayout
         )
     }
 }

@@ -82,126 +82,123 @@ struct RunRow: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            // Header - always visible, clickable to expand
-            HStack(spacing: 8) {
-                // Expand arrow for completed runs
-                if run.isComplete {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 10)
-                }
-
-                // Run indicator
-                if run.isComplete {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.caption)
-                } else {
-                    ProgressView()
-                        .controlSize(.mini)
-                }
-
-                // Format + quality badge
-                Text("\(run.format) Q\(run.quality)")
-                    .font(.caption.bold())
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.accentColor.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                // Counts
-                Text("\(run.completedCount)/\(run.itemCount)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-
-                if run.skippedCount > 0 {
-                    Text("(\(run.skippedCount) skipped)")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-
-                if run.failedCount > 0 {
-                    Text("(\(run.failedCount) failed)")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-
-                Spacer()
-
-                // Savings
-                if run.totalSavings > 0 {
-                    Text(String(localized: "Saved \(ByteCountFormatter.string(fromByteCount: run.totalSavings, countStyle: .file))"))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.green)
-                }
-
-                // Time
-                Text(formattedTime(run.elapsedTime))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.tertiary)
+            // Header - always visible; a completed run expands to show its details
+            Button(action: onToggleExpand) {
+                header
             }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if run.isComplete {
-                    onToggleExpand()
-                }
-            }
+            .buttonStyle(.plain)
+            .disabled(!run.isComplete)
+            .accessibilityHint(run.isComplete ? String(localized: "Shows or hides the run details") : "")
 
             // Progress bar for active run
             if !run.isComplete {
                 ProgressView(value: run.progress)
-                    .tint(run.failedCount > 0 ? .orange : .accentColor)
+                    .tint(run.failedCount > 0 ? .caution : .accentColor)
             }
 
             // Expanded detail - clickable stats
             if isExpanded && run.isComplete {
-                HStack(spacing: 16) {
-                    StatButton(
-                        icon: "checkmark.circle.fill", color: .green,
-                        label: "\(run.completedCount) completed"
-                    ) { onStatTap(.completed) }
-
-                    if run.failedCount > 0 {
-                        StatButton(
-                            icon: "xmark.circle.fill", color: .red,
-                            label: "\(run.failedCount) failed"
-                        ) { onStatTap(.failed) }
-                    }
-
-                    if run.skippedCount > 0 {
-                        StatButton(
-                            icon: "arrow.right.circle.fill", color: .orange,
-                            label: "\(run.skippedCount) skipped"
-                        ) { onStatTap(.skipped) }
-                    }
-
-                    Spacer()
-
-                    if run.totalSavings != 0 {
-                        Text(String(format: "%.1f%%", run.totalSavingsPercentage))
-                            .font(.caption.monospacedDigit().bold())
-                            .foregroundStyle(run.totalSavings > 0 ? .green : .red)
-                    }
-                }
-                .padding(.leading, run.isComplete ? 18 : 0)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                details
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(8)
         .background(isCurrent && !run.isComplete ? Color.accentColor.opacity(0.05) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        .onAppear {
-            if run.isComplete && isCurrent {
-                NSSound(named: "Glass")?.play()
-            }
-        }
     }
 
-    private func formattedTime(_ interval: TimeInterval) -> String {
-        let m = Int(interval) / 60
-        let s = Int(interval) % 60
-        return String(format: "%d:%02d", m, s)
+    private var header: some View {
+        HStack(spacing: 8) {
+            // Expand arrow for completed runs
+            if run.isComplete {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 10)
+            }
+
+            // Run indicator
+            if run.isComplete {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.success)
+                    .font(.caption)
+            } else {
+                ProgressView()
+                    .controlSize(.mini)
+            }
+
+            // Format + quality badge
+            Text("\(run.format) Q\(run.quality)")
+                .font(.caption.bold())
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.accentColor.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            // Counts
+            Text("\(run.completedCount)/\(run.itemCount)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondaryText)
+
+            if run.skippedCount > 0 {
+                Text(String(localized: "(\(run.skippedCount) skipped)"))
+                    .font(.caption)
+                    .foregroundStyle(.caution)
+            }
+
+            if run.failedCount > 0 {
+                Text(String(localized: "(\(run.failedCount) failed)"))
+                    .font(.caption)
+                    .foregroundStyle(.failure)
+            }
+
+            Spacer()
+
+            // Savings
+            if run.totalSavings > 0 {
+                Text(String(localized: "Saved \(ByteCountFormatter.string(fromByteCount: run.totalSavings, countStyle: .file))"))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.success)
+            }
+
+            // Time
+            Text(Duration.seconds(run.elapsedTime).formatted(.time(pattern: .minuteSecond)))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondaryText)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var details: some View {
+            HStack(spacing: 16) {
+                StatButton(
+                    icon: "checkmark.circle.fill", color: .success,
+                    label: String(localized: "\(run.completedCount) completed")
+                ) { onStatTap(.completed) }
+
+                if run.failedCount > 0 {
+                    StatButton(
+                        icon: "xmark.circle.fill", color: .failure,
+                        label: String(localized: "\(run.failedCount) failed")
+                    ) { onStatTap(.failed) }
+                }
+
+                if run.skippedCount > 0 {
+                    StatButton(
+                        icon: "arrow.right.circle.fill", color: .caution,
+                        label: String(localized: "\(run.skippedCount) skipped")
+                    ) { onStatTap(.skipped) }
+                }
+
+                Spacer()
+
+                if run.totalSavings != 0 {
+                    Text(run.totalSavingsPercentage / 100, format: .percent.precision(.fractionLength(1)))
+                        .font(.caption.monospacedDigit().bold())
+                        .foregroundStyle(run.totalSavings > 0 ? .success : .failure)
+                }
+            }
+            .padding(.leading, 18)
     }
 }
 
@@ -219,15 +216,12 @@ struct StatButton: View {
                 Image(systemName: icon)
                     .foregroundStyle(color)
                     .font(.caption)
-                Text(String(localized: "\(label)"))
+                Text(label)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
             }
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-        }
     }
 }
 
@@ -248,18 +242,21 @@ struct StatusDetailSheet: View {
                     .font(.title3)
                 Text(headerTitle)
                     .font(.headline)
-                Text("- Run #\(runId)")
+                Text(String(localized: "- Run #\(runId)"))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                 Spacer()
-                Text(String(localized: "\(filteredItems.count) items"))
+                Text(CountText.items(filteredItems.count))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                 Button { dismiss() } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .help(String(localized: "Close"))
+                .accessibilityLabel(String(localized: "Close"))
             }
             .padding()
 
@@ -268,7 +265,7 @@ struct StatusDetailSheet: View {
             if filteredItems.isEmpty {
                 Spacer()
                 Text(String(localized: "No items"))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                 Spacer()
             } else {
                 List(filteredItems) { item in
@@ -307,9 +304,9 @@ struct StatusDetailSheet: View {
 
     private var headerColor: Color {
         switch statusType {
-        case .completed: .green
-        case .failed: .red
-        case .skipped: .orange
+        case .completed: .success
+        case .failed: .failure
+        case .skipped: .caution
         }
     }
 
@@ -350,7 +347,7 @@ private struct DetailRow: View {
 
                 Text(reasonText)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .lineLimit(2)
             }
 
@@ -364,7 +361,7 @@ private struct DetailRow: View {
                     Text(size)
                         .font(.caption)
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.secondaryText)
                         .frame(width: 60, alignment: .trailing)
                 }
             }
