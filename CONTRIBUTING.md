@@ -11,21 +11,21 @@ By submitting a contribution (pull request, patch, or suggestion), you agree to 
 1. Fork the repository
 2. Clone your fork and create a new branch:
    ```bash
-   git clone https://github.com/<your-username>/PixelDiet.git
-   cd PixelDiet
+   git clone https://github.com/<your-username>/pixel-diet.git
+   cd pixel-diet
    git checkout -b feature/your-feature-name
    ```
-3. Open `PixelDiet.xcodeproj` in Xcode 16+ (Swift 6.2 required)
+3. Open `PixelDiet.xcodeproj` in Xcode 26+ (Swift 6.2 required)
 4. Make your changes
-5. Run tests: Product > Test (Cmd+U)
+5. Run tests: Product > Test (Cmd+U). Unit tests run in CI; also run the UI tests (`PixelDietUITests`) locally for changes that touch the UI
 6. Commit and push to your fork
 7. Open a pull request against `main`
 
 ## Development Requirements
 
 - **macOS 14.0+** (Sonoma)
-- **Xcode 16+** with Swift 6.2 support
-- No external dependencies to install - everything is built-in
+- **Xcode 26+** with Swift 6.2 support
+- No dependencies to install manually - Xcode resolves the libwebp package automatically
 
 ## Project Structure
 
@@ -34,8 +34,8 @@ PixelDiet/
 ├── Models/          # Data models (ImageItem, BatchJob, ImageFormat, etc.)
 ├── Views/           # SwiftUI views
 │   └── Components/  # Reusable UI components
-├── ViewModels/      # MainViewModel, SettingsViewModel
-├── Services/        # ImageCompressor, BatchProcessor, ThumbnailService, etc.
+├── ViewModels/      # MainViewModel
+├── Services/        # ImageCompressor, BatchProcessor, ThumbnailService, BatchFeedback, etc.
 │   └── Protocols/   # ImageCompressing, ImageAnalyzing
 └── Utilities/       # Constants, error types, path sanitizer, logger
 ```
