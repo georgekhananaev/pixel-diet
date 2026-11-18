@@ -15,11 +15,22 @@
   <img src="https://img.shields.io/badge/license-Non--Commercial-red" alt="License">
 </p>
 
+<p align="center">
+  <a href="https://apps.apple.com/app/pixeldiet/id6831985315"><img src="docs/media/mac-app-store-badge.svg" height="52" alt="Download on the Mac App Store"></a>
+</p>
+
 ---
 
 PixelDiet is a native macOS application for batch image compression, resizing, and format conversion. Drop hundreds of images and watch them shrink - using all your CPU cores.
 
 Built with Apple's native frameworks (ImageIO, Core Graphics, Accelerate/vImage) plus libwebp for WebP encoding - no other dependencies. Fully sandboxed, fully offline - your images never leave your Mac.
+
+## Download
+
+- **Mac App Store (recommended):** [PixelDiet on the Mac App Store](https://apps.apple.com/app/pixeldiet/id6831985315) - free, with automatic updates.
+- **Direct download:** the notarized DMG from the [latest GitHub release](https://github.com/georgekhananaev/pixel-diet/releases/latest). Open it and drag PixelDiet to Applications.
+
+Use one or the other: both install the same app, so remove the DMG copy from Applications before installing from the App Store.
 
 ## Screenshots
 

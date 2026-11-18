@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 
 ## [Unreleased]
 
+### Changed
+
+- **readme**: Mac App Store badge and a Download section linking the App Store listing and the notarized GitHub DMG
+
 ## [1.1.0] - 2026-11-07
 
 ### Added
