@@ -155,7 +155,7 @@ PixelDiet collects no data. It makes no network requests. All image processing h
 
 ## Support
 
-Questions, problems or feedback: see [Support](SUPPORT.md) for answers to common questions, email [george@khananaev.com](mailto:george@khananaev.com), or [open an issue](https://github.com/georgekhananaev/pixel-diet/issues).
+Questions, problems or feedback: see [Support](SUPPORT.md) for answers to common questions, or [open an issue](https://github.com/georgekhananaev/pixel-diet/issues).
 
 ## License
 

@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver
 
 - **readme**: Mac App Store badge and a Download section linking the App Store listing and the notarized GitHub DMG
 - **app-store**: Future versions are set to release automatically after App Review approval
+- **readme**: Support section links SUPPORT.md and GitHub issues instead of listing the email address
 
 ## [1.1.0] - 2026-11-07
 
