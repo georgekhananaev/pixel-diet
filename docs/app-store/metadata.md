@@ -73,7 +73,7 @@ Without a status the app is removed from the EU storefronts.
 | What's New | Not shown for a first version; see [What's New](#whats-new-for-the-github-release-and-the-next-update) |
 | Routing App Coverage File | Not applicable |
 | App Previews (optional) | None |
-| Version Release | **OWNER**: Manually release (recommended for a first release) or automatically after approval |
+| Version Release | **Automatically release this version** for every version after 1.1.0 (owner decision 2026-11-19). App Store Connect stores this per version, so pick it on each new version page before submitting. 1.1.0 itself was released manually on 2026-11-19. |
 | App tags (U.S. storefront only) | Assigned by Apple after review; check them under App Information and deselect any that don't describe PixelDiet |
 
 **Promotional Text (≤ 170, editable at any time):**
